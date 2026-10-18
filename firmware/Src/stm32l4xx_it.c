@@ -75,7 +75,7 @@ void NMI_Handler(void)
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
   if (app_nmi_handled())
   {
-    return;   /* Flash ECC（設定レコード読み出し）: 無効レコードとして扱う */
+    return;   /* Flash ECC（設定レコード・USB メモリ読み出し）: 読み出し側が nv_ecc_error で検出する */
   }
   app_fault_safe_state();
   NVIC_SystemReset();

@@ -52,9 +52,9 @@ void board_init(void)
     gpio_cfg(GPIOA, VM_SENSE_PIN | TEMP_PIN | AD_IN_PIN | DAC_VREF_PIN, GPIO_MODE_ANALOG,
              GPIO_NOPULL, GPIO_SPEED_FREQ_LOW, 0);
 
-    /* I2C2 */
-    gpio_cfg(I2C_PC_PORT, I2C_PC_SCL_PIN | I2C_PC_SDA_PIN, GPIO_MODE_AF_OD, GPIO_NOPULL,
-             GPIO_SPEED_FREQ_HIGH, GPIO_AF4_I2C2);
+    /* CAN1（PC15=CAN_S を Low にした後、comm_init が CAN を起動する） */
+    gpio_cfg(CAN_PORT, CAN_RX_PIN | CAN_TX_PIN, GPIO_MODE_AF_PP, GPIO_NOPULL,
+             GPIO_SPEED_FREQ_HIGH, GPIO_AF9_CAN1);
 
     /* µs 遅延用サイクルカウンタ */
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;

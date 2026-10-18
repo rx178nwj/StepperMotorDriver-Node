@@ -21,7 +21,7 @@
 #define FAIL_EN         (1u << 0)   /* PA10 ODR/IDR が High */
 #define FAIL_DMODE      (1u << 1)   /* PB12-14 のどれかが High */
 #define FAIL_RESET      (1u << 2)   /* PB15 が High */
-#define FAIL_AGC        (1u << 3)   /* PB8/PB9 のどれかが High */
+#define FAIL_AGC        (1u << 3)   /* PB10/PB11 のどれかが High */
 #define FAIL_CLK        (1u << 4)   /* PA8 のピンレベルが High */
 #define FAIL_DAC_CODE   (1u << 5)   /* DAC1 DOR1 ≠ 0 */
 #define FAIL_DAC_OFF    (1u << 6)   /* DAC1 CH1 が停止（VREF が浮く） */

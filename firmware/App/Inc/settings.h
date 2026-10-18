@@ -37,4 +37,8 @@ bool settings_load(settings_t *s);
 /* 追記保存。モータ停止中に呼ぶこと（消去中は CPU が最大約 25 ms 停止する） */
 bool settings_save(const settings_t *s);
 
+/* Flash 読み出しで ECC エラー（NMI）が起きると立つ。読む側が false にしてから読み、読み終えて確認する
+ * （設定レコードの読み出しと USB のメモリ読み出しで共用。NMI_Handler は app_nmi_handled で立てる） */
+extern volatile bool nv_ecc_error;
+
 #endif /* SETTINGS_H */

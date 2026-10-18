@@ -58,7 +58,9 @@ set(APP_SOURCES
     App/Src/monitor.c
     App/Src/settings.c
     App/Src/stepper.c
+    App/Src/symtab.c
     App/Src/ui.c
+    App/Src/usb_proto.c
 )
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
@@ -68,6 +70,12 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # アプリコードだけ警告を強める。Debug でもパルス生成割り込みの処理時間を確保するため -Og にする
 set_source_files_properties(${APP_SOURCES} PROPERTIES
     COMPILE_OPTIONS "-Wextra;-Wno-unused-parameter;$<$<CONFIG:Debug>:-Og>"
+)
+
+# ELF に GNU build-id（SHA1）を入れる（FR-USB-34）。リンカスクリプト App/STM32L433xx_app.ld の
+# .note.gnu.build-id に配置され、USB の EXCHANGE_ID が返す
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+    -Wl,--build-id=sha1
 )
 
 # Add include paths

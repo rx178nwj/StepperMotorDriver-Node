@@ -22,12 +22,13 @@ void EXTI3_IRQHandler(void)
     HAL_GPIO_EXTI_IRQHandler(DRV_LO2_PIN);
 }
 
-void I2C2_EV_IRQHandler(void)
+/* CAN1: 受信（FIFO0）とエラー。送信割り込みは使わない（メールボックスの空きを見て投入する） */
+void CAN1_RX0_IRQHandler(void)
 {
-    comm_ev_isr();
+    comm_can_rx0_isr();
 }
 
-void I2C2_ER_IRQHandler(void)
+void CAN1_SCE_IRQHandler(void)
 {
-    comm_er_isr();
+    comm_can_sce_isr();
 }

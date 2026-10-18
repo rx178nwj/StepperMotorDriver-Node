@@ -78,6 +78,25 @@ SECTIONS
     . = ALIGN(8);
   } >FLASH
 
+  /* GNU build-id（リンクオプション -Wl,--build-id=sha1 でリンカが生成するノート）。
+   * USB の EXCHANGE_ID がここから SHA1 20 バイトを返す（FR-USB-34）。ELF の build-id と照合できる */
+  .note.gnu.build-id :
+  {
+    . = ALIGN(4);
+    __build_id_start = .;
+    KEEP(*(.note.gnu.build-id))
+    __build_id_end = .;
+  } >FLASH
+
+  /* USB 名前表（symtab.h の SYM_ENTRY が .sym_table セクションに置くエントリを連結する） */
+  .sym_table :
+  {
+    . = ALIGN(4);
+    __sym_table_start = .;
+    KEEP(*(.sym_table))
+    __sym_table_end = .;
+  } >FLASH
+
   /* The program code and other data goes into FLASH */
   .text :
   {

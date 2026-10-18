@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include "usb_proto.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -155,6 +155,7 @@ static int8_t CDC_Init_FS(void)
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+  usb_proto_on_bus_event();   /* 新しい構成になったのでセッションは切断状態から始める */
   return (USBD_OK);
   /* USER CODE END 3 */
 }
@@ -166,6 +167,7 @@ static int8_t CDC_Init_FS(void)
 static int8_t CDC_DeInit_FS(void)
 {
   /* USER CODE BEGIN 4 */
+  usb_proto_on_bus_event();   /* バスリセット（USBD_LL_Reset がクラスを解除する）等でセッション切断 */
   return (USBD_OK);
   /* USER CODE END 4 */
 }
@@ -261,6 +263,7 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
+  usb_proto_rx_isr(Buf, *Len);   /* リングバッファへ積むだけ（解析は main ループ） */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
@@ -283,6 +286,9 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
+  if (hcdc == NULL){
+    return USBD_FAIL;   /* 未構成（ホスト未接続など）のときクラスデータは NULL */
+  }
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }

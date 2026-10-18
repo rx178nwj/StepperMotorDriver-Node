@@ -6,7 +6,7 @@
 #define CONFIG_H
 
 #define FW_VERSION_MAJOR        0
-#define FW_VERSION_MINOR        2
+#define FW_VERSION_MINOR        3
 #define DEVICE_ID               0xA3
 
 /* ---- クロック ---- */
@@ -38,8 +38,25 @@
 #define BOARD_TEMP_FAULT_DC     800
 #define TEMP_INVALID            ((int16_t)0x8000)
 
-/* ---- I2C ---- */
-#define I2C_ADDR_BASE           0x30u        /* 暫定。実アドレス = BASE + DIP ID */
+/* ---- CAN（bxCAN、CAN 2.0A）----
+ * ビットレートは 125000 / 250000 / 500000 / 1000000 から選ぶ（暫定 500 kbit/s、要求仕様 U-1）。
+ * 1 ビット = 16 tq（SYNC 1 + BS1 13 + BS2 2、サンプル点 87.5%）、SJW = 1 tq。 */
+#define CAN_BITRATE_BPS         500000UL
+#define CAN_PCLK_HZ             80000000UL   /* APB1 = 80 MHz */
+#define CAN_TQ_PER_BIT          16UL
+#define CAN_PRESCALER           (CAN_PCLK_HZ / (CAN_BITRATE_BPS * CAN_TQ_PER_BIT))
+#if (CAN_PRESCALER < 1UL) || (CAN_PRESCALER > 1024UL) || \
+    ((CAN_PRESCALER * CAN_BITRATE_BPS * CAN_TQ_PER_BIT) != CAN_PCLK_HZ)
+#error "CAN_BITRATE_BPS cannot be generated exactly from CAN_PCLK_HZ with 16 tq/bit"
+#endif
+
+/* CAN ID（要求仕様 FR-COM-03）。ID = DIP 値 0〜7 */
+#define CAN_ID_BROADCAST        0x000u       /* 上位 → 全台 */
+#define CAN_ID_FAULT_BASE       0x080u       /* 基板 → 上位（異常通知）+ ID */
+#define CAN_ID_REQUEST_BASE     0x100u       /* 上位 → 基板（要求）+ ID */
+#define CAN_ID_RESPONSE_BASE    0x180u       /* 基板 → 上位（応答）+ ID */
+
+#define COMM_LED_ERR_BLINK_MS   500u         /* エラーパッシブ／バスオフ中の LED_COMM 点滅周期（2 Hz） */
 
 /* ---- モーション ---- */
 #define STEP_RATE_MAX           100000u      /* step/s */

@@ -73,7 +73,10 @@
 #define USB_SIZ_BOS_DESC            0x0C
 
 /* USER CODE BEGIN PRIVATE_DEFINES */
-
+/* FR-USB-02: 製品文字列（VID/PID は上の既定値 0x0483/0x5740、シリアル番号は Get_SerialNum が UID から生成）。
+ * 再生成で上の定義が戻っても、この区間で上書きされる */
+#undef USBD_PRODUCT_STRING_FS
+#define USBD_PRODUCT_STRING_FS     "NEMA23 Stepper Driver"
 /* USER CODE END PRIVATE_DEFINES */
 
 /**

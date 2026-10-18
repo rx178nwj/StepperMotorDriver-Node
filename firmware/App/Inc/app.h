@@ -38,6 +38,18 @@ typedef enum {
 #define RESULT_INVALID        2u   /* 値が範囲外 */
 #define RESULT_FAILED         3u   /* 実行失敗（Flash 書き込み失敗、保存設定なし） */
 
+/*
+ * レジスタアクセス（通信トランスポートに依存しない。main ループから呼ぶ）
+ * app_reg_write: reg から len バイトを書く（len 1〜6）。戻り値は CMD_RESULT（CMD_RESULT レジスタにも反映）。
+ *   32bit レジスタは全バイトが含まれる場合だけ反映し、部分書き込み・書き込み不可のバイトを含む場合は
+ *   RESULT_INVALID。複数レジスタはアドレス昇順で反映する。
+ * app_reg_read: reg から len バイトのスナップショットを out へ。マップ外は 0xFF。
+ * app_broadcast_command: ブロードキャスト指令（DISABLE/STOP/ESTOP）。CMD_RESULT は更新しない。
+ */
+uint8_t app_reg_write(uint8_t reg, const uint8_t *data, uint8_t len);
+void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out);
+void app_broadcast_command(uint8_t cmd);
+
 void app_init(void);
 void app_tick_1ms(uint32_t now_ms);
 void app_tick_10ms(uint32_t now_ms);

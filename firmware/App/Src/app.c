@@ -6,6 +6,7 @@
 #include "monitor.h"
 #include "settings.h"
 #include "stepper.h"
+#include "symtab.h"
 #include "ui.h"
 #include <string.h>
 
@@ -23,11 +24,13 @@ static settings_t cfg;
 static uint8_t cfg_status;
 
 static app_state_t state = APP_NO_VM;
+static app_state_t prev_state = APP_NO_VM;   /* 異常通知用: 前回の tick での状態 */
 static uint8_t fault_bits;
 static volatile uint8_t isr_fault;
 static uint8_t cmd_result;
 static uint8_t board_id;
 static uint32_t now;
+static uint8_t status_snapshot;   /* STATUS レジスタの値（1 ms 周期で更新。USB の名前表で公開） */
 
 static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID };
 static bool vm_ok;
@@ -305,24 +308,32 @@ static uint8_t write_reg(uint8_t addr, const uint8_t *p)
     }
 }
 
-/* 完全に含まれるレジスタだけ反映（32bit 値の部分書き込みは無視） */
-static void handle_write(const comm_write_t *w)
+/* 完全に含まれるレジスタだけ反映（32bit 値の部分書き込みは反映せず RESULT_INVALID） */
+uint8_t app_reg_write(uint8_t reg, const uint8_t *d, uint8_t len)
 {
-    uint32_t base = w->data[0];
-    uint32_t n = (uint32_t)w->len - 1u;
-    const uint8_t *d = &w->data[1];
+    uint32_t base = reg;
+    uint32_t n = len;
+    uint32_t covered = 0;
     uint8_t result = RESULT_OK;
-    bool any = false;
 
     for (uint32_t i = 0; i < sizeof writable / sizeof writable[0]; i++) {
         uint32_t a = writable[i].addr;
         if (a >= base && a + writable[i].size <= base + n) {
             uint8_t r = write_reg((uint8_t)a, d + (a - base));
             if (r != RESULT_OK) result = r;
-            any = true;
+            covered += writable[i].size;
         }
     }
-    cmd_result = any ? result : RESULT_INVALID;
+    if (covered != n) {
+        result = RESULT_INVALID;   /* 部分書き込み・書き込み不可・未定義アドレスのバイトを含む */
+    }
+    cmd_result = result;
+    return result;
+}
+
+void app_broadcast_command(uint8_t cmd)
+{
+    (void)command(cmd);
 }
 
 static uint8_t status_bits(void)
@@ -339,7 +350,8 @@ static uint8_t status_bits(void)
     return s;
 }
 
-static void update_image(void)
+/* 読み出し要求のたびにその場でレジスタイメージを作る（main ループ内なので 1 フレーム分は一貫した値） */
+void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
 {
     uint8_t m[REG_MAP_SIZE];
     memset(m, 0, sizeof m);
@@ -370,7 +382,11 @@ static void update_image(void)
     wr32(&m[0x38], cfg.jog_speed);
     wr16(&m[0x3C], cfg.hold_delay_ms);
     wr16(&m[0x3E], cfg.steps_per_rev);
-    comm_update_image(m, sizeof m);
+
+    for (uint32_t i = 0; i < len; i++) {
+        uint32_t a = (uint32_t)reg + i;
+        out[i] = a < REG_MAP_SIZE ? m[a] : 0xFFu;   /* マップ外は 0xFF */
+    }
 }
 
 /* ---------------------------------------------------------------- 周期処理 */
@@ -444,7 +460,7 @@ static void handle_motion(void)
 
     /* 通信タイムアウト（ジョグ中は対象外） */
     if (cfg.comm_timeout_ms != 0 && jog_dir == 0 && (stepper_is_running() || pending) &&
-        (now - comm_last_access_ms()) > cfg.comm_timeout_ms) {
+        (int32_t)(now - comm_last_request_ms()) > (int32_t)cfg.comm_timeout_ms) {
         stepper_stop();
     }
 }
@@ -503,7 +519,7 @@ void app_init(void)
         cfg = t;
     }
     apply_stepper_params();
-    comm_init((uint8_t)(I2C_ADDR_BASE + board_id));
+    comm_init(board_id);   /* CAN_S は board_init で Low 済み（FR-COM-14） */
     state = APP_NO_VM;
 }
 
@@ -512,12 +528,10 @@ void app_tick_1ms(uint32_t now_ms)
     now = now_ms;
     handle_driver_fault();
 
-    comm_write_t w;
-    while (comm_pop_write(&w)) {
-        handle_write(&w);
-    }
+    comm_poll();
 
     ui_scan_switches();
+    status_snapshot = status_bits();
     handle_switches();
     handle_motion();
 
@@ -526,10 +540,16 @@ void app_tick_1ms(uint32_t now_ms)
         .moving = stepper_is_running(),
         .fault_code = fault_code(),
         .temp_warn = temp_warn,
-        .comm_count = comm_access_count(),
+        .comm_count = comm_activity_count(),
+        .comm_error = comm_bus_degraded(),
     };
     ui_update(now, &v);
-    update_image();
+
+    /* FAULT へ遷移したとき 1 回だけ異常通知（FR-COM-10） */
+    if (state == APP_FAULT && prev_state != APP_FAULT) {
+        comm_notify_fault((uint8_t)state, fault_bits);
+    }
+    prev_state = state;
 }
 
 void app_tick_10ms(uint32_t now_ms)
@@ -587,3 +607,36 @@ void app_tick_10ms(uint32_t now_ms)
         enter_fault(FAULT_OVERTEMP);
     }
 }
+
+/* ---------------------------------------------------------------- USB 名前表（状態遷移・監視・設定） */
+
+SYM_ENTRY(state, SYM_U8, 1);              /* STATE: 0 NO_VM、1 DISABLED、2 ENABLED、3 FAULT */
+SYM_ENTRY_AS("fault", fault_bits, SYM_U8, 1);   /* FAULT レジスタ */
+SYM_ENTRY_AS("status", status_snapshot, SYM_U8, 1);   /* STATUS レジスタ（1 ms 周期のスナップショット） */
+SYM_ENTRY(cmd_result, SYM_U8, 1);
+SYM_ENTRY(cfg_status, SYM_U8, 1);
+SYM_ENTRY(isr_fault, SYM_U8, 1);
+SYM_ENTRY(vm_ok, SYM_U8, 1);
+SYM_ENTRY(hold_active, SYM_U8, 1);
+SYM_ENTRY(temp_warn, SYM_U8, 1);
+SYM_ENTRY(lo_armed, SYM_U8, 1);
+
+SYM_ENTRY(mon.vdda_mv, SYM_U32, 1);
+SYM_ENTRY(mon.vm_mv, SYM_U32, 1);
+SYM_ENTRY(mon.board_temp_dc, SYM_I16, 1);
+SYM_ENTRY(mon.mcu_temp_dc, SYM_I16, 1);
+SYM_ENTRY(mon.ad_in_mv, SYM_U32, 1);
+
+SYM_ENTRY(cfg, SYM_BYTES, sizeof(cfg));
+SYM_ENTRY(cfg.run_current_ma, SYM_U16, 1);
+SYM_ENTRY(cfg.hold_current_ma, SYM_U16, 1);
+SYM_ENTRY(cfg.microstep, SYM_U8, 1);
+SYM_ENTRY(cfg.flags, SYM_U8, 1);
+SYM_ENTRY(cfg.comm_timeout_ms, SYM_U16, 1);
+SYM_ENTRY(cfg.max_speed, SYM_U32, 1);
+SYM_ENTRY(cfg.accel, SYM_U32, 1);
+SYM_ENTRY(cfg.decel, SYM_U32, 1);
+SYM_ENTRY(cfg.start_speed, SYM_U32, 1);
+SYM_ENTRY(cfg.jog_speed, SYM_U32, 1);
+SYM_ENTRY(cfg.hold_delay_ms, SYM_U16, 1);
+SYM_ENTRY(cfg.steps_per_rev, SYM_U16, 1);

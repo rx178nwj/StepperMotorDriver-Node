@@ -1,9 +1,19 @@
 #include "monitor.h"
 #include "board.h"
 #include "config.h"
+#include "symtab.h"
 #include <math.h>
 
 static ADC_HandleTypeDef hadc;
+
+/* 直近の変換結果（12bit 生値）。USB の名前表で公開する */
+static struct {
+    uint16_t vrefint;
+    uint16_t vm;
+    uint16_t board_temp;
+    uint16_t ad_in;
+    uint16_t mcu_temp;
+} adc_raw;
 
 void monitor_init(void)
 {
@@ -82,9 +92,23 @@ void monitor_sample(monitor_values_t *out)
     uint32_t ad_raw = read_channel(ADC_CHANNEL_12);    /* PA7 */
     uint32_t ts_raw = read_channel(ADC_CHANNEL_TEMPSENSOR);
 
+    adc_raw.vrefint = (uint16_t)vref_raw;
+    adc_raw.vm = (uint16_t)vm_raw;
+    adc_raw.board_temp = (uint16_t)temp_raw;
+    adc_raw.ad_in = (uint16_t)ad_raw;
+    adc_raw.mcu_temp = (uint16_t)ts_raw;
+
     out->vdda_mv = vdda;
     out->vm_mv = (uint32_t)((float)vm_raw * (float)vdda / 4095.0f * VM_DIVIDER_RATIO + 0.5f);
     out->board_temp_dc = ntc_temp_dc(temp_raw);
     out->mcu_temp_dc = mcu_temp_dc(ts_raw, vdda);
     out->ad_in_mv = ad_raw * vdda / 4095u;
 }
+
+/* ---------------------------------------------------------------- USB 名前表（ADC 生値） */
+
+SYM_ENTRY(adc_raw.vrefint, SYM_U16, 1);
+SYM_ENTRY(adc_raw.vm, SYM_U16, 1);
+SYM_ENTRY(adc_raw.board_temp, SYM_U16, 1);
+SYM_ENTRY(adc_raw.ad_in, SYM_U16, 1);
+SYM_ENTRY(adc_raw.mcu_temp, SYM_U16, 1);

@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "board.h"
+#include "config.h"
 
 #define DEBOUNCE_MS      20u
 #define COMM_FLASH_MS    50u
@@ -74,5 +75,10 @@ void ui_update(uint32_t now, const ui_view_t *v)
         comm_seen = v->comm_count;
         comm_until = now + COMM_FLASH_MS;
     }
-    board_pin_write(LED_COMM_PORT, LED_COMM_PIN, (int32_t)(comm_until - now) > 0);
+    if (v->comm_error) {
+        /* エラーパッシブ／バスオフ中は 2 Hz 点滅（FR-UI-04） */
+        board_pin_write(LED_COMM_PORT, LED_COMM_PIN, (now % COMM_LED_ERR_BLINK_MS) < (COMM_LED_ERR_BLINK_MS / 2u));
+    } else {
+        board_pin_write(LED_COMM_PORT, LED_COMM_PIN, (int32_t)(comm_until - now) > 0);
+    }
 }

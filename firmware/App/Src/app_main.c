@@ -12,6 +12,7 @@
 #include "monitor.h"
 #include "stepper.h"
 #include "test_poweron.h"
+#include "usb_proto.h"
 
 static IWDG_HandleTypeDef app_iwdg;
 static uint32_t last_1ms;
@@ -58,6 +59,7 @@ void app_main_loop(void)
         last_10ms = t;
         app_tick_10ms(t);
     }
+    usb_proto_poll();   /* USB の受信解析・応答・イベント送信（ブロックしない） */
     HAL_IWDG_Refresh(&app_iwdg);
 }
 

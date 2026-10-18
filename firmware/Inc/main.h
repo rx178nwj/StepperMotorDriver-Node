@@ -61,8 +61,8 @@ void Error_Handler(void);
 #define ADDR2_GPIO_Port GPIOC
 #define PWR_ST_Pin GPIO_PIN_14
 #define PWR_ST_GPIO_Port GPIOC
-#define DRV_MO_Pin GPIO_PIN_15
-#define DRV_MO_GPIO_Port GPIOC
+#define CAN_S_Pin GPIO_PIN_15
+#define CAN_S_GPIO_Port GPIOC
 #define ADDR0_Pin GPIO_PIN_0
 #define ADDR0_GPIO_Port GPIOH
 #define ADDR1_Pin GPIO_PIN_1
@@ -87,10 +87,10 @@ void Error_Handler(void);
 #define LED_COMM_GPIO_Port GPIOB
 #define LED_FAULT_Pin GPIO_PIN_2
 #define LED_FAULT_GPIO_Port GPIOB
-#define I2C_PC_SCL_Pin GPIO_PIN_10
-#define I2C_PC_SCL_GPIO_Port GPIOB
-#define I2C_PC_SDA_Pin GPIO_PIN_11
-#define I2C_PC_SDA_GPIO_Port GPIOB
+#define DRV_AGC0_Pin GPIO_PIN_10
+#define DRV_AGC0_GPIO_Port GPIOB
+#define DRV_AGC1_Pin GPIO_PIN_11
+#define DRV_AGC1_GPIO_Port GPIOB
 #define DRV_DMODE0_Pin GPIO_PIN_12
 #define DRV_DMODE0_GPIO_Port GPIOB
 #define DRV_DMODE1_Pin GPIO_PIN_13
@@ -113,10 +113,10 @@ void Error_Handler(void);
 #define I2C_SENS_SCL_GPIO_Port GPIOB
 #define I2C_SENS_SDA_Pin GPIO_PIN_7
 #define I2C_SENS_SDA_GPIO_Port GPIOB
-#define DRV_AGC0_Pin GPIO_PIN_8
-#define DRV_AGC0_GPIO_Port GPIOB
-#define DRV_AGC1_Pin GPIO_PIN_9
-#define DRV_AGC1_GPIO_Port GPIOB
+#define CAN_RX_Pin GPIO_PIN_8
+#define CAN_RX_GPIO_Port GPIOB
+#define CAN_TX_Pin GPIO_PIN_9
+#define CAN_TX_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

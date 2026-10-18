@@ -1,6 +1,7 @@
 #include "stepper.h"
 #include "board.h"
 #include "config.h"
+#include "symtab.h"
 #include <math.h>
 
 #define OC1M_FORCE_INACTIVE  (4u << TIM_CCMR1_OC1M_Pos)
@@ -320,3 +321,20 @@ bool stepper_at_target(void)
 {
     return mode == MODE_POS && !running && position == target_pos;
 }
+
+/* ---------------------------------------------------------------- USB 名前表（パルス生成） */
+
+SYM_ENTRY(position, SYM_I32, 1);          /* 現在位置 [step] */
+SYM_ENTRY(cur_speed, SYM_F32, 1);         /* 現在速度 [step/s]（符号付き） */
+SYM_ENTRY(target_pos, SYM_I32, 1);        /* 目標位置 [step] */
+SYM_ENTRY(target_vel, SYM_F32, 1);        /* 速度モードの目標速度 [step/s] */
+SYM_ENTRY(mode, SYM_U8, 1);               /* 0 IDLE、1 POS、2 VEL */
+SYM_ENTRY(running, SYM_U8, 1);
+SYM_ENTRY(dir, SYM_I8, 1);
+SYM_ENTRY_AS("plan_speed", v, SYM_F32, 1);   /* プランナが直前に確定した速度 */
+SYM_ENTRY(commit_pos, SYM_I32, 1);        /* 確定済みステップを出し終えた後の位置 */
+SYM_ENTRY(prm.max_speed, SYM_F32, 1);
+SYM_ENTRY(prm.accel, SYM_F32, 1);
+SYM_ENTRY(prm.decel, SYM_F32, 1);
+SYM_ENTRY(prm.start_speed, SYM_F32, 1);
+SYM_ENTRY(prm.invert_dir, SYM_U8, 1);

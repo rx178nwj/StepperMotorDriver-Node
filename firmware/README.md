@@ -19,11 +19,27 @@ STM32L433CCU6 + TB67S249FTG。開発環境は STM32CubeMX ＋ VS Code（ST 公�
 
 - `Src/main.c`：USER CODE 2 で `app_main_init()`、ループ内 USER CODE 3 で `app_main_loop()`
 - `Src/stm32l4xx_it.c`：NMI で Flash ECC を処理（`app_nmi_handled()`）、HardFault でドライバ出力停止（Release はリセット、Debug は停止）
-- TIM1・EXTI2/3・CAN1（RX0/TX/SCE）の割り込みハンドラは `App/Src/app_irq.c`（.ioc では NVIC を無効にしてあるので CubeMX は生成しない）
+- TIM1・EXTI2/3・CAN1（RX0/SCE。送信割り込みは使わない）の割り込みハンドラは `App/Src/app_irq.c`（.ioc では NVIC を無効にしてあるので CubeMX は生成しない）
 - TIM1・ADC・DAC・CAN・GPIO・IWDG の `MX_xxx_Init()` は呼ばない設定（.ioc の Advanced Settings）。初期化は App 側で行う
 - USB 割り込み優先度は 3（パルス生成 0、LO 異常 1、CAN 2 より低い）
+- USB CDC：受信は `Src/usbd_cdc_if.c`（USER CODE 6）の `CDC_Receive_FS` から `usb_proto_rx_isr()` でリングバッファへ積むだけ。解析・応答は `app_main_loop()` から呼ぶ `usb_proto_poll()`。バスリセット／サスペンド／クラス初期化・解除（`CDC_Init_FS`・`CDC_DeInit_FS`、`HAL_PCD_SuspendCallback`）でセッションを切断
+- 製品文字列は `Src/usbd_desc.c` の USER CODE（PRIVATE_DEFINES）で `NEMA23 Stepper Driver` に上書き。VID/PID は生成値の 0x0483/0x5740、シリアル番号は生成コードの `Get_SerialNum` が UID から作る
 
-> 2026-10-17：要求仕様 0.3 で上位通信を I2C2（PCA9615）から CAN1（PB8/PB9、TJA1441AT）へ変更した。.ioc と App の CAN 対応は未実施（現行コードは I2C2 のまま）。
+> 2026-10-17：要求仕様 0.3 で上位通信を I2C2（PCA9615）から CAN1（PB8/PB9、TJA1441AT）へ変更した。.ioc と App（`App/Src/comm.c`）は CAN1 に対応済み（CAN 2.0A、既定 500 kbit/s で `App/Inc/config.h` の `CAN_BITRATE_BPS` で変更、ID 割り当てとレジスタ仕様は要求仕様 3.8 節）。AGC0/AGC1 は PB10/PB11 へ移動した。
+
+## USB 通信（デバッグ・内部設定）
+
+仕様は要求仕様 3.9 節。USB CDC（仮想 COM ポート）上で、CCP 風の要求・応答プロトコルを使う。実装は `App/Src/usb_proto.c`（フレーム層とコマンド）、`App/Src/symtab.c`（名前表）。
+
+- フレーム：`[0xA5][LEN][BODY][CRC16 下位][CRC16 上位]`（LEN 2〜250、CRC-16/CCITT-FALSE を LEN+BODY にかける）。要求 BODY `[CMD][CTR][PARAM…]`、応答 BODY `[0xFF][ERR][CTR][DATA…]`、イベント BODY `[0xFE][EVT][DATA…]`
+- 最初に CONNECT（CMD 0x01）。例：`A5 02 01 00 CD 91`（CTR=0）。未接続では CONNECT と GET_VERSION 以外は ERR 0x35
+- CAN_REQUEST（0x40）：CAN の要求フレームを `comm_process_request()` に渡し、CAN バスには送らずに応答フレームを USB で返す。LED_COMM は点灯しない
+- メモリ読み出し：SET_MTA＋UPLOAD、SHORT_UP（アドレス指定。Flash・SRAM・OTP・UID 領域のみ）、SYM_UPLOAD（名前指定）
+- build-id：リンクオプション `-Wl,--build-id=sha1` と、`App/STM32L433xx_app.ld` の `.note.gnu.build-id`（Flash に配置、`KEEP`）。EXCHANGE_ID（0x17）が SHA1 20 バイトを返すので、PC は ELF の build-id（`arm-none-eabi-readelf -n driver_fw.elf`）と一致を確認してからアドレス指定読み出しに使う
+- 名前表：`App/Inc/symtab.h` の `SYM_ENTRY(変数, SYM_U32, 要素数);` 1 行で登録する。エントリは `.sym_table` セクションに置かれ、リンカスクリプトが連結する。static 変数も、その変数を定義した .c の末尾で登録できる。INDEX はリンク順で決まり版ごとに変わるので、PC は SYM_FIND で名前から引く。登録一覧は [docs/usb_symbols.md](docs/usb_symbols.md)
+- 統計（`usb_stats`）：受信フレーム数・CRC エラー数・破棄数など。名前表から読める
+- 送信は 50 ms 続けて送れなかった応答・イベントを破棄する（ホストが COM ポートを開いていないときもメインループを止めない）
+- 書き込み（DNLOAD 相当）、USB↔CAN バスのブリッジ、VBUS 検出は実装していない
 
 ## 使い方
 

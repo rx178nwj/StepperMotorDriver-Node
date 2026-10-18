@@ -22,9 +22,9 @@
 #define DRV_DMODE0_PIN   GPIO_PIN_12
 #define DRV_DMODE1_PIN   GPIO_PIN_13
 #define DRV_DMODE2_PIN   GPIO_PIN_14
-#define DRV_AGC_PORT     GPIOB   /* PB8/PB9 = AGC0/AGC1 */
-#define DRV_AGC0_PIN     GPIO_PIN_8
-#define DRV_AGC1_PIN     GPIO_PIN_9
+#define DRV_AGC_PORT     GPIOB   /* PB10/PB11 = AGC0/AGC1（0.3 で PB8/PB9 から変更） */
+#define DRV_AGC0_PIN     GPIO_PIN_10
+#define DRV_AGC1_PIN     GPIO_PIN_11
 #define DRV_LO_PORT      GPIOA   /* PA2 = LO1, PA3 = LO2（OD, R30/R33 → +3V3） */
 #define DRV_LO1_PIN      GPIO_PIN_2
 #define DRV_LO2_PIN      GPIO_PIN_3
@@ -41,10 +41,10 @@
 #define AD_IN_PORT       GPIOA   /* PA7 = ADC1_IN12 (J10.5) */
 #define AD_IN_PIN        GPIO_PIN_7
 
-/* ---- I2C2（PC 通信、PCA9615 経由） ---- */
-#define I2C_PC_PORT      GPIOB   /* PB10 = SCL, PB11 = SDA, AF4 */
-#define I2C_PC_SCL_PIN   GPIO_PIN_10
-#define I2C_PC_SDA_PIN   GPIO_PIN_11
+/* ---- CAN1（上位通信、TJA1441AT 経由） ---- */
+#define CAN_PORT         GPIOB   /* PB8 = CAN1_RX, PB9 = CAN1_TX, AF9 */
+#define CAN_RX_PIN       GPIO_PIN_8
+#define CAN_TX_PIN       GPIO_PIN_9
 
 /* ---- アドレス DIP（ON = 1、外付けプルダウン） ---- */
 #define ADDR0_PORT       GPIOH   /* PH0 */
@@ -77,7 +77,7 @@
 /* ---- 割り込み優先度（数値が小さいほど高い） ---- */
 #define IRQ_PRIO_STEP    0   /* TIM1 更新: パルス生成 */
 #define IRQ_PRIO_FAULT   1   /* EXTI2/3: LO1/LO2 */
-#define IRQ_PRIO_I2C     2   /* I2C2 スレーブ */
+#define IRQ_PRIO_CAN     2   /* CAN1 RX0/TX/SCE（USB は 3） */
 
 void board_init(void);
 void board_delay_us(uint32_t us);

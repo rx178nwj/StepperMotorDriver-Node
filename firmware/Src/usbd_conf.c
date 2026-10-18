@@ -26,7 +26,7 @@
 #include "usbd_cdc.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "usb_proto.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -213,6 +213,7 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
   USBD_LL_Suspend((USBD_HandleTypeDef*)hpcd->pData);
   /* Enter in STOP mode. */
   /* USER CODE BEGIN 2 */
+  usb_proto_on_bus_event();   /* FR-USB-07: サスペンドでセッションを切断状態にする */
   if (hpcd->Init.low_power_enable)
   {
     /* Set SLEEPDEEP bit and SleepOnExit of Cortex System Control Register. */
