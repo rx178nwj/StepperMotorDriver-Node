@@ -13,7 +13,11 @@
 #define REC_SIZE       64u
 #define REC_PER_PAGE   (FLASH_PAGE_SIZE / REC_SIZE)
 #define REC_MAGIC      0x4D53454Eu   /* "NESM" */
-#define REC_VERSION    1u
+#define REC_VERSION    2u
+/* 版 1: settings_t が 32 バイト（s の後ろの予約 12 バイト + CRC）。版 2 は s が 40 バイトで、
+ * 新項目は版 1 の s の直後に追加しただけなので、CRC の位置は同じ。版 1 は新項目を既定値で補って読む */
+#define REC_VERSION_V1 1u
+#define SETTINGS_V1_SIZE 32u
 
 typedef struct {
     /* dword0: 最後に書く（コミット印） */
@@ -23,17 +27,17 @@ typedef struct {
     /* dword1 */
     uint32_t seq;
     uint32_t reserved0;
-    /* dword2-5 */
+    /* dword2-6 */
     settings_t s;
-    /* dword6-7 */
+    /* dword7 */
     uint32_t reserved1;
-    uint32_t reserved2;
-    uint32_t reserved3;
     uint32_t crc;
 } record_t;
 
-_Static_assert(sizeof(settings_t) == 32, "settings_t layout changed: bump REC_VERSION");
+_Static_assert(sizeof(settings_t) == 40, "settings_t layout changed: bump REC_VERSION");
+_Static_assert(offsetof(settings_t, gear_ratio) == SETTINGS_V1_SIZE, "v1 fields must stay in place");
 _Static_assert(sizeof(record_t) == REC_SIZE, "record size");
+_Static_assert(offsetof(record_t, crc) == REC_SIZE - 4u, "crc must stay at the end (v1 compatible)");
 
 volatile bool nv_ecc_error;
 
@@ -52,6 +56,7 @@ bool app_nmi_handled(void)
 
 void settings_defaults(settings_t *s)
 {
+    memset(s, 0, sizeof *s);
     s->run_current_ma = DEF_RUN_CURRENT_MA;
     s->hold_current_ma = DEF_HOLD_CURRENT_MA;
     s->microstep = DEF_MICROSTEP;
@@ -64,6 +69,9 @@ void settings_defaults(settings_t *s)
     s->jog_speed = DEF_JOG_SPEED;
     s->hold_delay_ms = DEF_HOLD_DELAY_MS;
     s->steps_per_rev = DEF_STEPS_PER_REV;
+    s->gear_ratio = DEF_GEAR_RATIO;
+    s->sensor_offset = DEF_SENSOR_OFFSET;
+    s->pa7_mode = DEF_PA7_MODE;
 }
 
 static bool clamp16(uint16_t *v, uint16_t lo, uint16_t hi)
@@ -91,8 +99,9 @@ bool settings_sanitize(settings_t *s)
         s->microstep = DEF_MICROSTEP;
         changed = true;
     }
-    if (s->flags & ~(SETTINGS_FLAG_INVERT_DIR | SETTINGS_FLAG_LOCAL_JOG)) {
-        s->flags &= SETTINGS_FLAG_INVERT_DIR | SETTINGS_FLAG_LOCAL_JOG;
+    const uint8_t flags_mask = SETTINGS_FLAG_INVERT_DIR | SETTINGS_FLAG_LOCAL_JOG | SETTINGS_FLAG_SENSOR_DIR;
+    if (s->flags & ~flags_mask) {
+        s->flags &= flags_mask;
         changed = true;
     }
     changed |= clamp32(&s->max_speed, 1u, STEP_RATE_MAX);
@@ -102,6 +111,12 @@ bool settings_sanitize(settings_t *s)
     changed |= clamp32(&s->accel, 1u, 10000000u);
     changed |= clamp32(&s->decel, 1u, 10000000u);
     changed |= clamp16(&s->steps_per_rev, 1u, 0xFFFFu);
+    changed |= clamp16(&s->gear_ratio, 1u, GEAR_RATIO_MAX);
+    changed |= clamp16(&s->sensor_offset, 0u, SENSOR_OFFSET_MAX);
+    if (s->pa7_mode > PA7_MODE_Z) {
+        s->pa7_mode = DEF_PA7_MODE;
+        changed = true;
+    }
     return changed;
 }
 
@@ -142,7 +157,9 @@ static slot_state_t read_slot(uint32_t addr, record_t *r)
     if (blank) {
         return SLOT_BLANK;
     }
-    if (r->magic == REC_MAGIC && r->version == REC_VERSION && r->size == sizeof(settings_t) &&
+    bool layout_ok = (r->version == REC_VERSION && r->size == sizeof(settings_t)) ||
+                     (r->version == REC_VERSION_V1 && r->size == SETTINGS_V1_SIZE);
+    if (r->magic == REC_MAGIC && layout_ok &&
         r->crc == crc32((const uint8_t *)r, offsetof(record_t, crc))) {
         return SLOT_VALID;
     }
@@ -182,7 +199,13 @@ bool settings_load(settings_t *s)
     if (!l.found) {
         return false;
     }
-    *s = l.rec.s;
+    if (l.rec.version == REC_VERSION_V1) {
+        settings_defaults(s);                       /* 新項目（位置センサ関連）は既定値 */
+        memcpy(s, &l.rec.s, SETTINGS_V1_SIZE);
+    } else {
+        *s = l.rec.s;
+        memset(s->reserved, 0, sizeof s->reserved);
+    }
     return true;
 }
 

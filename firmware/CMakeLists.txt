@@ -56,6 +56,7 @@ set(APP_SOURCES
     App/Src/comm.c
     App/Src/drv.c
     App/Src/monitor.c
+    App/Src/position.c
     App/Src/settings.c
     App/Src/stepper.c
     App/Src/symtab.c

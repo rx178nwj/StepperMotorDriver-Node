@@ -23,10 +23,16 @@ typedef struct {
     uint32_t jog_speed;        /* step/s */
     uint16_t hold_delay_ms;
     uint16_t steps_per_rev;    /* モータのフルステップ数/回転（上位側の換算用） */
+    /* ---- 以下はレコード版 2 で追加（位置センサ、3.10 節）。版 1 のレコードは既定値で補う ---- */
+    uint16_t gear_ratio;       /* モータ軸 : 出力軸、1〜1000 */
+    uint16_t sensor_offset;    /* 出力軸の原点に対する RAW ANGLE、0〜4095 */
+    uint8_t  pa7_mode;         /* 0 AD_IN、1 DIR、2 Z */
+    uint8_t  reserved[3];      /* 常に 0（メモリ比較・保存でパディングの不定値を避ける） */
 } settings_t;
 
 #define SETTINGS_FLAG_INVERT_DIR  (1u << 0)
 #define SETTINGS_FLAG_LOCAL_JOG   (1u << 1)
+#define SETTINGS_FLAG_SENSOR_DIR  (1u << 2)   /* PA7_MODE=1 のとき AS5600 の DIR ピンの出力レベル */
 
 void settings_defaults(settings_t *s);
 /* 範囲外の値を丸める。丸めた項目があれば true */

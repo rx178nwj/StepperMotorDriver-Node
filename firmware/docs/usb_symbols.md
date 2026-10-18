@@ -7,7 +7,7 @@ INDEX はリンク順で決まるため版ごとに変わる。PC は SYM_FIND�
 TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列（NUM = バイト数）。サイズ = 要素サイズ × NUM。
 8 バイト以下の変数は割り込みを禁止してコピーする。それより大きい変数（`cfg`・`comm_stats`・`usb_stats`）は 32bit 単位のコピーで、フィールド間の同時性は保証しない。
 
-登録数は 66（2026-10-18 時点。`arm-none-eabi-size -A` の `.sym_table` ÷ 12 で確認できる）。
+登録数は 79（2026-10-18 時点。`arm-none-eabi-size -A` の `.sym_table` ÷ 12 で確認できる）。
 
 ## 状態遷移（`App/Src/app.c`）
 
@@ -34,6 +34,7 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `target_vel` | f32 | 速度モードの目標速度 [step/s] |
 | `mode` | u8 | 0 IDLE、1 POS（位置決め）、2 VEL（速度） |
 | `running` | u8 | パルス出力中 |
+| `touched` | u8 | 起動後に一度でもパルス出力を開始した、または SET_POSITION 等で位置を再定義した（位置センサの自動同期の判断用） |
 | `dir` | i8 | 現在の移動方向（+1/-1） |
 | `plan_speed` | f32 | プランナが直前に確定したステップの速度（実体は `v`。加減速の内部状態） |
 | `commit_pos` | i32 | 確定済みステップを全て出した後の位置（プランナの先行位置） |
@@ -51,7 +52,7 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `mon.vm_mv` | u32 | VM [mV] |
 | `mon.board_temp_dc` | i16 | 基板温度 [0.1 °C]（無効は -32768） |
 | `mon.mcu_temp_dc` | i16 | MCU 温度 [0.1 °C] |
-| `mon.ad_in_mv` | u32 | J10 アナログ入力 [mV] |
+| `mon.ad_in_mv` | u32 | J10 アナログ入力 [mV]。PA7_MODE≠0 のときは計測せず 0xFFFF |
 | `adc_raw.vrefint` | u16 | ADC 生値（12bit）VREFINT |
 | `adc_raw.vm` | u16 | ADC 生値 PA0（VM 分圧） |
 | `adc_raw.board_temp` | u16 | ADC 生値 PA6（NTC） |
@@ -60,11 +61,11 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 
 ## RAM 上の設定（`App/Src/app.c`、要求仕様 3.7 節）
 
-`cfg` は `settings_t` 全体（32 バイト、TYPE 0x10）。個別のフィールドも登録している。
+`cfg` は `settings_t` 全体（40 バイト、TYPE 0x10。レコード版 2 で 32 → 40 バイトに拡張）。個別のフィールドも登録している。
 
 | 名前 | TYPE | 内容（レジスタ） |
 |---|---|---|
-| `cfg` | 0x10 ×32 | 設定全体 |
+| `cfg` | 0x10 ×40 | 設定全体 |
 | `cfg.run_current_ma` | u16 | 運転電流 [mA]（0x20） |
 | `cfg.hold_current_ma` | u16 | 保持電流 [mA]（0x22） |
 | `cfg.microstep` | u8 | 分割（0x24） |
@@ -77,6 +78,23 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `cfg.jog_speed` | u32 | ジョグ速度（0x38） |
 | `cfg.hold_delay_ms` | u16 | 保持移行時間 [ms]（0x3C） |
 | `cfg.steps_per_rev` | u16 | 1 回転のフルステップ数（0x3E） |
+| `cfg.gear_ratio` | u16 | ギヤ比（0x54） |
+| `cfg.sensor_offset` | u16 | センサ原点オフセット（0x56） |
+| `cfg.pa7_mode` | u8 | PA7 の機能（0x58）。0 AD_IN、1 DIR、2 Z |
+
+## 位置センサ AS5600（`App/Src/position.c`、`App/Src/app.c`、要求仕様 3.10 節 FR-POS-10）
+
+| 名前 | TYPE | 内容 |
+|---|---|---|
+| `sensor.raw` | u16 | 最後に読めた RAW ANGLE（0〜4095）。無効になっても最後の値を保持する（レジスタ 0x1A は無効時 0xFFFF） |
+| `sensor.as_status` | u8 | 最後に読めた AS5600 STATUS（bit3 MH、bit4 ML、bit5 MD） |
+| `sensor.fail_streak` | u8 | 連続失敗回数（3 で無効。起動直後は 3） |
+| `sensor.z_level` | u8 | Z 入力レベル（PA7_MODE=2 のとき。それ以外は 0） |
+| `sensor.i2c_ok` | u32 | I2C トランザクションの成功回数 |
+| `sensor.i2c_fail` | u32 | I2C トランザクションの失敗回数（タイムアウト・NACK・バスエラー・バス固着） |
+| `pa7_applied` | u8 | PA7 に実際に設定している機能（0 AD_IN、1 DIR、2 Z） |
+| `sensor_status` | u8 | SENSOR_STATUS レジスタ（10 ms 周期のスナップショット。実体は `sensor_status_snapshot`） |
+| `shaft_angle` | u16 | SHAFT_ANGLE レジスタ [0.01°]（10 ms 周期のスナップショット。無効時 0xFFFF。実体は `shaft_angle_snapshot`） |
 
 ## CAN 統計（`App/Src/comm.c`）
 

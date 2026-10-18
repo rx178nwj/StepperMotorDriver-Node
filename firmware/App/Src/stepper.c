@@ -33,6 +33,7 @@ static volatile int32_t position;    /* 出力済みパルスで数えた位置 
 static volatile bool running;
 static volatile int8_t dir = 1;
 static volatile float cur_speed;     /* 報告用（符号付き） */
+static volatile bool touched;        /* パルス出力を開始した、または位置を再定義した */
 
 /* プランナ（パルス出力より 1 ステップ先行する） */
 static float v;                      /* 直前に確定したステップの速度 */
@@ -257,6 +258,7 @@ bool stepper_service(void)
     }
     cur_speed = s1 * (float)d;
     running = true;
+    touched = true;
     /* 最初のパルスは 1 周期後（≥10 µs）なので DIR のセットアップ時間は確保される */
     TIM1->CR1 |= TIM_CR1_CEN;
     __set_PRIMASK(pm);
@@ -303,6 +305,7 @@ bool stepper_set_position(int32_t pos)
     __disable_irq();
     bool ok = !running;
     if (ok) {
+        touched = true;
         position = pos;
         target_pos = pos;
         target_vel = 0.0f;
@@ -322,6 +325,11 @@ bool stepper_at_target(void)
     return mode == MODE_POS && !running && position == target_pos;
 }
 
+bool stepper_touched(void)
+{
+    return touched;
+}
+
 /* ---------------------------------------------------------------- USB 名前表（パルス生成） */
 
 SYM_ENTRY(position, SYM_I32, 1);          /* 現在位置 [step] */
@@ -330,6 +338,7 @@ SYM_ENTRY(target_pos, SYM_I32, 1);        /* 目標位置 [step] */
 SYM_ENTRY(target_vel, SYM_F32, 1);        /* 速度モードの目標速度 [step/s] */
 SYM_ENTRY(mode, SYM_U8, 1);               /* 0 IDLE、1 POS、2 VEL */
 SYM_ENTRY(running, SYM_U8, 1);
+SYM_ENTRY(touched, SYM_U8, 1);            /* パルスを出した／位置を再定義した（自動同期の判断用） */
 SYM_ENTRY(dir, SYM_I8, 1);
 SYM_ENTRY_AS("plan_speed", v, SYM_F32, 1);   /* プランナが直前に確定した速度 */
 SYM_ENTRY(commit_pos, SYM_I32, 1);        /* 確定済みステップを出し終えた後の位置 */

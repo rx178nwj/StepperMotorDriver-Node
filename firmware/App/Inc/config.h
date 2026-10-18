@@ -77,5 +77,23 @@
 #define DEF_JOG_SPEED           1600u
 #define DEF_HOLD_DELAY_MS       500u
 #define DEF_STEPS_PER_REV       200u         /* 1.8°/step */
+#define DEF_GEAR_RATIO          20u          /* 出力軸 1 回転あたりのモータ回転数（U-11） */
+#define DEF_SENSOR_OFFSET       0u
+#define DEF_PA7_MODE            1u           /* 1 = DIR（AS5600 の DIR ピンを駆動） */
+
+/* ---- 出力軸の位置センサ AS5600（I2C1、要求仕様 3.10 節）---- */
+#define GEAR_RATIO_MAX          1000u
+#define SENSOR_OFFSET_MAX       4095u
+#define PA7_MODE_AD_IN          0u
+#define PA7_MODE_DIR            1u
+#define PA7_MODE_Z              2u
+#define AS5600_ADDR7            0x36u
+/* I2C1 は PCLK1 = 80 MHz。PRESC=3（tPRESC 50 ns）、SCLL=0x1B（28 単位）、SCLH=0x12（19 単位）、SCLDEL=7、SDADEL=1 で SCL 約 380 kHz
+ * （tLOW 1.4 µs、tHIGH 0.95 µs、データセットアップ 400 ns）。CubeMX 生成の Timing（0x00000E14）は
+ * 80 MHz では約 2 MHz になるため使わず、position_init で上書きする。要実機確認 */
+#define POS_I2C_TIMING          0x3071121Bu
+#define POS_I2C_TIMEOUT_US      500u         /* 1 トランザクション全体の上限（バス復帰を含めて 1 ms 未満） */
+#define POS_FAIL_LIMIT          3u           /* 連続失敗でセンサ無効 */
+#define POS_RETRY_MS            1000u        /* 無効の間の再接続周期 */
 
 #endif /* CONFIG_H */

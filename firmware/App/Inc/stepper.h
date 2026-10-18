@@ -39,6 +39,10 @@ bool stepper_set_position(int32_t pos);   /* 停止中のみ */
 int32_t stepper_speed(void);              /* 符号付き step/s */
 bool stepper_at_target(void);
 
+/* 起動後に一度でもパルス出力を開始した、または stepper_set_position で位置を再定義したら true
+ * （位置センサの自動同期の可否判断用。FR-POS-09） */
+bool stepper_touched(void);
+
 void stepper_timer_isr(void);
 
 #endif /* STEPPER_H */

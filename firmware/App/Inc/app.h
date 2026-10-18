@@ -31,12 +31,13 @@ typedef enum {
 #define CMD_SAVE_SETTINGS     7u   /* 現在の設定を Flash へ保存（停止中のみ） */
 #define CMD_LOAD_SETTINGS     8u   /* 保存済み設定へ戻す（停止中のみ） */
 #define CMD_FACTORY_SETTINGS  9u   /* 工場出荷値へ戻す（RAM のみ。保存は SAVE で） */
+#define CMD_SYNC_POSITION     10u  /* 位置センサの角度から POSITION を設定する（停止中のみ） */
 
 /* CMD_RESULT レジスタ */
 #define RESULT_OK             0u
 #define RESULT_REJECTED       1u   /* 現在の状態では実行できない */
 #define RESULT_INVALID        2u   /* 値が範囲外 */
-#define RESULT_FAILED         3u   /* 実行失敗（Flash 書き込み失敗、保存設定なし） */
+#define RESULT_FAILED         3u   /* 実行失敗（Flash 書き込み失敗、保存設定なし、位置センサ無効） */
 
 /*
  * レジスタアクセス（通信トランスポートに依存しない。main ループから呼ぶ）

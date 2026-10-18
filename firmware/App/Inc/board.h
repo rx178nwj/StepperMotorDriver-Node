@@ -41,6 +41,11 @@
 #define AD_IN_PORT       GPIOA   /* PA7 = ADC1_IN12 (J10.5) */
 #define AD_IN_PIN        GPIO_PIN_7
 
+/* ---- 位置センサ AS5600（I2C1、J9） ---- */
+#define I2C_SENS_PORT    GPIOB   /* PB6 = I2C1_SCL, PB7 = I2C1_SDA（AF4、オープンドレイン、外付け 4.7k プルアップ） */
+#define I2C_SENS_SCL_PIN GPIO_PIN_6
+#define I2C_SENS_SDA_PIN GPIO_PIN_7
+
 /* ---- CAN1（上位通信、TJA1441AT 経由） ---- */
 #define CAN_PORT         GPIOB   /* PB8 = CAN1_RX, PB9 = CAN1_TX, AF9 */
 #define CAN_RX_PIN       GPIO_PIN_8
@@ -77,7 +82,7 @@
 /* ---- 割り込み優先度（数値が小さいほど高い） ---- */
 #define IRQ_PRIO_STEP    0   /* TIM1 更新: パルス生成 */
 #define IRQ_PRIO_FAULT   1   /* EXTI2/3: LO1/LO2 */
-#define IRQ_PRIO_CAN     2   /* CAN1 RX0/TX/SCE（USB は 3） */
+#define IRQ_PRIO_CAN     2   /* CAN1 RX0/TX/SCE（USB は 3）。I2C1（位置センサ）は割り込みを使わない */
 
 void board_init(void);
 void board_delay_us(uint32_t us);

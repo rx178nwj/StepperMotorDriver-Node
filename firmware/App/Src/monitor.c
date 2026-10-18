@@ -82,14 +82,14 @@ static int16_t mcu_temp_dc(uint32_t raw, uint32_t vdda_mv)
     return (int16_t)lrintf(t * 10.0f);
 }
 
-void monitor_sample(monitor_values_t *out)
+void monitor_sample(monitor_values_t *out, bool measure_ad_in)
 {
     uint32_t vref_raw = read_channel(ADC_CHANNEL_VREFINT);
     uint32_t vdda = vref_raw ? (VREFINT_CAL_VREF * (uint32_t)*VREFINT_CAL_ADDR) / vref_raw : 3300u;
 
     uint32_t vm_raw = read_channel(ADC_CHANNEL_5);     /* PA0 */
     uint32_t temp_raw = read_channel(ADC_CHANNEL_11);  /* PA6 */
-    uint32_t ad_raw = read_channel(ADC_CHANNEL_12);    /* PA7 */
+    uint32_t ad_raw = measure_ad_in ? read_channel(ADC_CHANNEL_12) : 0u;   /* PA7（GPIO のときは変換しない） */
     uint32_t ts_raw = read_channel(ADC_CHANNEL_TEMPSENSOR);
 
     adc_raw.vrefint = (uint16_t)vref_raw;
@@ -102,7 +102,7 @@ void monitor_sample(monitor_values_t *out)
     out->vm_mv = (uint32_t)((float)vm_raw * (float)vdda / 4095.0f * VM_DIVIDER_RATIO + 0.5f);
     out->board_temp_dc = ntc_temp_dc(temp_raw);
     out->mcu_temp_dc = mcu_temp_dc(ts_raw, vdda);
-    out->ad_in_mv = ad_raw * vdda / 4095u;
+    out->ad_in_mv = measure_ad_in ? ad_raw * vdda / 4095u : 0xFFFFu;
 }
 
 /* ---------------------------------------------------------------- USB 名前表（ADC 生値） */

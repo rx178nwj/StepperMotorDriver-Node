@@ -4,6 +4,7 @@
 #include "config.h"
 #include "drv.h"
 #include "monitor.h"
+#include "position.h"
 #include "settings.h"
 #include "stepper.h"
 #include "symtab.h"
@@ -32,7 +33,13 @@ static uint8_t board_id;
 static uint32_t now;
 static uint8_t status_snapshot;   /* STATUS レジスタの値（1 ms 周期で更新。USB の名前表で公開） */
 
-static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID };
+/* 位置センサ（3.10 節） */
+static bool sensor_synced;             /* SENSOR_STATUS bit4: SYNC_POSITION 実行済み */
+static bool sensor_auto_done;          /* FR-POS-09: 起動後に最初にセンサが有効になったときの判断を済ませた */
+static uint8_t sensor_status_snapshot; /* SENSOR_STATUS レジスタの値（10 ms 周期。USB の名前表で公開） */
+static uint16_t shaft_angle_snapshot;  /* SHAFT_ANGLE レジスタの値（10 ms 周期。USB の名前表で公開） */
+
+static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID, .ad_in_mv = 0xFFFFu };
 static bool vm_ok;
 static uint32_t vm_good_ms;
 static uint8_t vm_bad_count;
@@ -158,6 +165,24 @@ static uint8_t cmd_reset_angle(void)
 static bool motion_idle(void);
 static void apply_settings(void);
 
+/* SYNC_POSITION（FR-POS-06）。POSITION をセンサの出力軸角度から設定する */
+static uint8_t cmd_sync_position(void)
+{
+    if (stepper_is_running()) {
+        return RESULT_REJECTED;
+    }
+    if (!position_valid()) {
+        return RESULT_FAILED;
+    }
+    uint16_t a = position_axis_count(position_raw(), cfg.sensor_offset);
+    int32_t pos = position_sync_steps(a, cfg.gear_ratio, cfg.steps_per_rev, cfg.microstep);
+    if (!stepper_set_position(pos)) {
+        return RESULT_REJECTED;
+    }
+    sensor_synced = true;
+    return RESULT_OK;
+}
+
 static uint8_t cmd_save(void)
 {
     if (!motion_idle()) {
@@ -206,6 +231,7 @@ static uint8_t command(uint8_t c)
     case CMD_SAVE_SETTINGS:    return cmd_save();
     case CMD_LOAD_SETTINGS:    return cmd_load(false);
     case CMD_FACTORY_SETTINGS: return cmd_load(true);
+    case CMD_SYNC_POSITION:    return cmd_sync_position();
     default:                   return RESULT_INVALID;
     }
 }
@@ -233,6 +259,7 @@ static const reg_def_t writable[] = {
     {0x20, 2}, {0x22, 2}, {0x24, 1}, {0x25, 1}, {0x26, 2},
     {0x28, 4}, {0x2C, 4}, {0x30, 4}, {0x34, 4}, {0x38, 4}, {0x3C, 2}, {0x3E, 2},
     {0x40, 4}, {0x44, 4}, {0x48, 4}, {0x4C, 4}, {0x50, 1},
+    {0x54, 2}, {0x56, 2}, {0x58, 1},
 };
 
 static bool motion_idle(void)
@@ -244,6 +271,7 @@ static bool motion_idle(void)
 static void apply_settings(void)
 {
     apply_stepper_params();
+    position_pa7_set(cfg.pa7_mode, (cfg.flags & SETTINGS_FLAG_SENSOR_DIR) != 0);
     if (drv_is_awake()) {
         drv_wake(cfg.microstep);   /* 起床中は DMODE の書き換えのみ */
         bool run = state == APP_ENABLED && !hold_active;
@@ -268,6 +296,9 @@ static uint8_t write_setting(uint8_t addr, const uint8_t *p)
     case 0x38: t.jog_speed = rd32(p); break;
     case 0x3C: t.hold_delay_ms = rd16(p); break;
     case 0x3E: t.steps_per_rev = rd16(p); break;
+    case 0x54: t.gear_ratio = rd16(p); break;
+    case 0x56: t.sensor_offset = rd16(p); break;
+    case 0x58: t.pa7_mode = p[0]; break;
     default: return RESULT_INVALID;
     }
     if (settings_sanitize(&t)) {
@@ -350,6 +381,13 @@ static uint8_t status_bits(void)
     return s;
 }
 
+static uint8_t sensor_status_bits(void)
+{
+    uint8_t s = position_status_bits();
+    if (sensor_synced) s |= 1u << 4;
+    return s;
+}
+
 /* 読み出し要求のたびにその場でレジスタイメージを作る（main ループ内なので 1 フレーム分は一貫した値） */
 void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
 {
@@ -368,8 +406,12 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     wr16(&m[0x10], (uint16_t)(mon.vm_mv > 0xFFFFu ? 0xFFFFu : mon.vm_mv));
     wr16(&m[0x12], (uint16_t)mon.board_temp_dc);
     wr16(&m[0x14], (uint16_t)mon.mcu_temp_dc);
-    wr16(&m[0x16], (uint16_t)mon.ad_in_mv);
+    wr16(&m[0x16], cfg.pa7_mode == PA7_MODE_AD_IN ? (uint16_t)mon.ad_in_mv : 0xFFFFu);
     m[0x18] = cfg_status;
+    m[0x19] = sensor_status_bits();
+    wr16(&m[0x1A], position_raw());
+    wr16(&m[0x1C], position_shaft_angle(position_raw(), cfg.sensor_offset));
+    /* 0x1E〜0x1F は予約（0） */
     wr16(&m[0x20], cfg.run_current_ma);
     wr16(&m[0x22], cfg.hold_current_ma);
     m[0x24] = cfg.microstep;
@@ -382,6 +424,9 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     wr32(&m[0x38], cfg.jog_speed);
     wr16(&m[0x3C], cfg.hold_delay_ms);
     wr16(&m[0x3E], cfg.steps_per_rev);
+    wr16(&m[0x54], cfg.gear_ratio);
+    wr16(&m[0x56], cfg.sensor_offset);
+    m[0x58] = cfg.pa7_mode;
 
     for (uint32_t i = 0; i < len; i++) {
         uint32_t a = (uint32_t)reg + i;
@@ -519,6 +564,9 @@ void app_init(void)
         cfg = t;
     }
     apply_stepper_params();
+    position_init();
+    /* PA7 は設定を読み込んでから保存されたモードにする（それまではアナログ入力。FR-POS-11） */
+    position_pa7_set(cfg.pa7_mode, (cfg.flags & SETTINGS_FLAG_SENSOR_DIR) != 0);
     comm_init(board_id);   /* CAN_S は board_init で Low 済み（FR-COM-14） */
     state = APP_NO_VM;
 }
@@ -555,7 +603,18 @@ void app_tick_1ms(uint32_t now_ms)
 void app_tick_10ms(uint32_t now_ms)
 {
     now = now_ms;
-    monitor_sample(&mon);
+    monitor_sample(&mon, cfg.pa7_mode == PA7_MODE_AD_IN);
+
+    /* 位置センサ。最初に有効になった時点でモータが一度も動いていなければ自動で同期する（FR-POS-09） */
+    position_poll_10ms(now);
+    if (!sensor_auto_done && position_valid()) {
+        sensor_auto_done = true;
+        if (!stepper_touched()) {
+            (void)cmd_sync_position();
+        }
+    }
+    sensor_status_snapshot = sensor_status_bits();
+    shaft_angle_snapshot = position_shaft_angle(position_raw(), cfg.sensor_offset);
 
     /* VM 判定（ヒステリシス + 連続回数） */
     uint32_t lo = vm_ok ? VM_OK_MIN_MV : VM_OK_MIN_MV + VM_HYST_MV;
@@ -640,3 +699,10 @@ SYM_ENTRY(cfg.start_speed, SYM_U32, 1);
 SYM_ENTRY(cfg.jog_speed, SYM_U32, 1);
 SYM_ENTRY(cfg.hold_delay_ms, SYM_U16, 1);
 SYM_ENTRY(cfg.steps_per_rev, SYM_U16, 1);
+SYM_ENTRY(cfg.gear_ratio, SYM_U16, 1);
+SYM_ENTRY(cfg.sensor_offset, SYM_U16, 1);
+SYM_ENTRY(cfg.pa7_mode, SYM_U8, 1);
+
+/* 位置センサ（実体は position.c の sensor.* と pa7_applied も参照） */
+SYM_ENTRY_AS("sensor_status", sensor_status_snapshot, SYM_U8, 1);   /* SENSOR_STATUS レジスタ（10 ms 周期） */
+SYM_ENTRY_AS("shaft_angle", shaft_angle_snapshot, SYM_U16, 1);      /* SHAFT_ANGLE レジスタ [0.01°]（10 ms 周期） */
