@@ -10895,6 +10895,16 @@
 		)
 		(uuid "258bfd00-391e-4eaf-af7f-99a229beb5d8")
 	)
+	(text "AWG22 で 3A 定格のため、3A 運転では余裕がない。\n3A 付近で運転する場合は J4（JST VH B4P-VH、AWG16 で 10A 定格）を使い、\n電線は AWG18 以上にする。J3 と J4 は同じ出力を並列に出すコネクタなので、\n同時に 2 台のモーターはつながない |"
+		(exclude_from_sim no)
+		(at 250.698 526.034 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "264ec14e-2d78-4cf0-bb41-3fee1baeb0e9")
+	)
 	(text "USB only: MCU on, motor VM off.\nUSB current before enumeration <=100mA total.\nVM = ADC/4095 * VDDA * 19; wait >=10ms after power changes.\n4.5A is driver absolute peak maximum; initial VREF limit ~1.97A/phase.\nRoute high-current PGND via NT1 only; keep BUCK_SW away from ADC.\nAP2112 dissipation and motor/Q1 cooling require thermal validation."
 		(exclude_from_sim no)
 		(at 688.086 407.924 0)
@@ -19683,7 +19693,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Thermistor_NTC"
+		(property "Value" "NCP18XH103F03RB"
 			(at 128.27 192.0874 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35679,7 +35689,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "f3f70867-a4ab-465a-96b5-82a182b505c3")
 		(property "Reference" "R32"
 			(at 305.562 471.424 0)

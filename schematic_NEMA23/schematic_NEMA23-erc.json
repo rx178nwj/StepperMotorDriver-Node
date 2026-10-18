@@ -1,0 +1,98 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-10-18T17:47:41",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.0.4",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/9fdd081c-730e-4fc3-b866-b3cdf49e5309",
+            "violations": [
+                {
+                    "description": "現在の構成にはフットプリント ライブラリ '' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル IC1 [TB67S249FTG,EL]",
+                            "pos": {
+                                "x": 1.9177,
+                                "y": 4.0513
+                            },
+                            "uuid": "29694ec6-a6df-45af-b2f6-52e1674ee8fb"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "現在の構成にはフットプリント ライブラリ '' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル IC2 [STM32L433CCU6]",
+                            "pos": {
+                                "x": 3.0861,
+                                "y": 1.3208
+                            },
+                            "uuid": "57d85fb5-dd49-4fef-b489-ab3e92e95dee"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "現在の構成にはシンボル ライブラリ 'USB Protection' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル U5 [NCP360]",
+                            "pos": {
+                                "x": 6.3119,
+                                "y": 1.0414
+                            },
+                            "uuid": "518f27e0-eba5-4b14-9a18-d8ddb3734d4c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_issues"
+                },
+                {
+                    "description": "シンボル 'PAD' が、ライブラリ 'Libraries' のコピーと一致しません",
+                    "items": [
+                        {
+                            "description": "シンボル U7 [PAD]",
+                            "pos": {
+                                "x": 7.0866,
+                                "y": 5.5245
+                            },
+                            "uuid": "53d3264e-040c-435d-bfa0-3f5e24ea4c4d"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        }
+    ],
+    "source": "schematic_NEMA23.kicad_sch"
+}
