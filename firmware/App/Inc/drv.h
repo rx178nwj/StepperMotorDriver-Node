@@ -1,5 +1,5 @@
 /*
- * drv.h — TB67S249FTG 制御（DMODE / ENABLE / RESET / VREF(DAC) / LO1・LO2 / MO）
+ * drv.h — TB67S249FTG 制御（DMODE / ENABLE / RESET / VREF(DAC) / LO1・LO2）
  */
 #ifndef DRV_H
 #define DRV_H
@@ -33,7 +33,6 @@ void drv_set_current_min(void);
 
 void drv_pulse_reset(void);
 drv_fault_t drv_read_fault(void);
-bool drv_mo_low(void);
 
 /* LO 割り込みの有効化（VM 正常かつスタンバイ解除後のみ有効にする） */
 void drv_fault_irq_arm(bool armed);

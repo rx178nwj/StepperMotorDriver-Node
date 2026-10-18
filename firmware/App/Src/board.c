@@ -21,6 +21,7 @@ void board_init(void)
 
     /* 出力は Low を先に書いてからモード設定（安全状態: EN=L, DMODE=000, RESET=L, AGC=00） */
     DRV_DIR_PORT->BRR = DRV_DIR_PIN | DRV_EN_PIN | LED_RUN_PIN;
+    CAN_S_PORT->BRR = CAN_S_PIN;   /* CAN_S = Low（ノーマルモード） */
     GPIOB->BRR = DRV_RESET_PIN | DRV_DMODE0_PIN | DRV_DMODE1_PIN | DRV_DMODE2_PIN |
                  DRV_AGC0_PIN | DRV_AGC1_PIN | LED_MCU_PIN | LED_COMM_PIN | LED_FAULT_PIN;
 
@@ -29,6 +30,9 @@ void board_init(void)
     gpio_cfg(GPIOB, DRV_RESET_PIN | DRV_DMODE0_PIN | DRV_DMODE1_PIN | DRV_DMODE2_PIN |
                     DRV_AGC0_PIN | DRV_AGC1_PIN | LED_MCU_PIN | LED_COMM_PIN | LED_FAULT_PIN,
              GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW, 0);
+
+    /* CAN_S: PC15（RTC ドメインで駆動能力は小さいが、S は静的入力なので問題ない） */
+    gpio_cfg(CAN_S_PORT, CAN_S_PIN, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW, 0);
 
     /* CLK: TIM1_CH1。タイマ側で Low 出力に初期化される */
     gpio_cfg(DRV_CLK_PORT, DRV_CLK_PIN, GPIO_MODE_AF_PP, GPIO_NOPULL,
@@ -39,7 +43,7 @@ void board_init(void)
              GPIO_SPEED_FREQ_LOW, 0);
 
     /* 入力（外付けプル抵抗あり） */
-    gpio_cfg(GPIOC, DRV_MO_PIN | PWR_ST_PIN | ADDR2_PIN, GPIO_MODE_INPUT, GPIO_NOPULL,
+    gpio_cfg(GPIOC, PWR_ST_PIN | ADDR2_PIN, GPIO_MODE_INPUT, GPIO_NOPULL,
              GPIO_SPEED_FREQ_LOW, 0);
     gpio_cfg(GPIOH, ADDR0_PIN | ADDR1_PIN, GPIO_MODE_INPUT, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW, 0);
     gpio_cfg(GPIOB, SW1_PIN | SW2_PIN, GPIO_MODE_INPUT, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW, 0);

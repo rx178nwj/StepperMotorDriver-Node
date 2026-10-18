@@ -28,8 +28,8 @@
 #define DRV_LO_PORT      GPIOA   /* PA2 = LO1, PA3 = LO2（OD, R30/R33 → +3V3） */
 #define DRV_LO1_PIN      GPIO_PIN_2
 #define DRV_LO2_PIN      GPIO_PIN_3
-#define DRV_MO_PORT      GPIOC   /* PC15 = MO（OD, R36 → +3V3） */
-#define DRV_MO_PIN       GPIO_PIN_15
+#define CAN_S_PORT       GPIOC   /* PC15 = CAN_S（TJA1441AT の S。Low＝ノーマル、High＝サイレント） */
+#define CAN_S_PIN        GPIO_PIN_15
 #define DAC_VREF_PORT    GPIOA   /* PA4 = DAC1_OUT1 */
 #define DAC_VREF_PIN     GPIO_PIN_4
 

@@ -20,7 +20,7 @@
 | 項目 | 設定 |
 |---|---|
 | **RCC** → High Speed Clock (HSE) | **Disable**（PH0/PH1 をアドレス入力に使うため） |
-| **RCC** → Low Speed Clock (LSE) | **Disable**（PC14/PC15 を入力に使うため） |
+| **RCC** → Low Speed Clock (LSE) | **Disable**（PC14 を入力、PC15 を GPIO 出力 CAN_S に使うため） |
 | **SYS** → Debug | **Trace Asynchronous Sw**（SWDIO=PA13、SWCLK=PA14、SWO=PB3） |
 | **SYS** → Timebase Source | SysTick |
 | **IWDG** | Activated にチェック（LSI を有効にするため。パラメータは既定のまま） |
@@ -45,6 +45,7 @@ User Label 欄にネット名を入れる。
 | PB1 | LED_COMM | |
 | PA5 | LED_RUN | |
 | PB2 | LED_FAULT | |
+| PC15 | CAN_S | TJA1441AT の S。Low＝ノーマル、High＝サイレント。RTC ドメインのピンで駆動能力は小さいが静的入力なので問題なし |
 
 GPIO 設定（System Core → GPIO）：上の出力はすべて **Output level = Low、Push Pull、No pull、Speed = Low**。
 
@@ -52,7 +53,6 @@ GPIO 設定（System Core → GPIO）：上の出力はすべて **Output level 
 
 | ピン | User Label |
 |---|---|
-| PC15 | DRV_MO |
 | PC14 | PWR_ST |
 | PH0 | ADDR0 |
 | PH1 | ADDR1 |

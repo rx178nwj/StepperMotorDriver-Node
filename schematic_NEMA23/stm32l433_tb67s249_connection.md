@@ -62,7 +62,9 @@
 | `DRV_AGC1` | MCU → DRV | AGC設定 1 |
 | `DRV_LO1` | DRV → MCU | エラーフラグ1（オープンドレイン） |
 | `DRV_LO2` | DRV → MCU | エラーフラグ2（オープンドレイン） |
-| `DRV_MO` | DRV → MCU | 電気角モニタ（オープンドレイン） |
+| `CAN_S` | MCU → IC3 | CAN トランシーバ TJA1441AT の S（サイレントモード制御）。Low＝ノーマル、High＝サイレント |
+
+TB67S249 の MO（Pin 46）は未接続（NoConnect）。電気角モニタは使わない。
 
 ### 2.4 上位通信用 CAN（2026-10-17 変更。旧：PC通信用 I2C2）
 
@@ -95,8 +97,8 @@
                  │                                          │          RSAGND 15,16├─ PGND
        (EXTI2)PA2│12 ──DRV_LO1──┬────────────────────────── 47│LO1       RSBGND 21,22├─ PGND
        (EXTI3)PA3│13 ──DRV_LO2──┼─┬──────────────────────── 48│LO2                   │
-             PC15│4  ──DRV_MO───┼─┼─┬────────────────────── 46│MO        GND 8,29,30 ├─ GND
-                 │          R17 R18 R19 10k→+3V3_D          │          EP/コーナー  ├─ GND
+             PC15│4  ──CAN_S──→ IC3 TJA1441AT S (8)       NC 46│MO(未接続) GND 8,29,30 ├─ GND
+                 │          R17 R18 10k→+3V3_D              │          EP/コーナー  ├─ GND
   (DAC1_OUT1) PA4│14 ──DAC_VREF─R20 10k─┬─DRV_VREF───────── 32│VREFA                 │
                  │                      ├────────────────── 31│VREFB      VCC 33,34  ├─ DRV_VCC
                  │                   R21 9.1k  C16 100nF     │          OSCM 35     │
@@ -112,7 +114,7 @@ PB8 (45, CAN1_RX) ── CAN_RX ── RXD (4)                       │        
                        +5V ─── VCC (3) ─ C41 100nF→GND     R49 120Ω   D7 TVS
                       +3V3 ─── VIO (5) ─ C42 100nF→GND       │       (CANH/CANL→GND)
                        GND ─── GND (2)                    SW2-4 (TERM)  │
-                       GND ─── S   (8)  ※常時ノーマル     │          │
+         PC15 (4) ── CAN_S ── S   (8)  ※Low＝ノーマル   │          │
                                                   CANL (6) ──┴──────────┴──── CANL ── J1.2 / J2.2
                                                                        GND ── J1.3 / J2.3
 ```
@@ -136,13 +138,14 @@ PB8 (45, CAN1_RX) ── CAN_RX ── RXD (4)                       │        
 | 22 | PB11 | `DRV_AGC1` | GPIO出力、プッシュプル（2026-10-17 PB9 から移動） | 2 AGC1 |
 | 12 | PA2 | `DRV_LO1` | GPIO入力、内部プルなし、EXTI2（立ち下がり） | 47 LO1 |
 | 13 | PA3 | `DRV_LO2` | GPIO入力、内部プルなし、EXTI3（立ち下がり） | 48 LO2 |
-| 4 | PC15 | `DRV_MO` | GPIO入力、内部プルなし（ポーリング） | 46 MO |
+| 4 | PC15 | `CAN_S` | GPIO出力、プッシュプル、低速、プルなし（Low＝ノーマル、High＝サイレント） | IC3（TJA1441AT）Pin 8 S |
 | 14 | PA4 | `DAC_VREF` | **DAC1_OUT1**（バッファ有効） | R20 経由で 31 VREFB / 32 VREFA |
 
 **電気的整合**
 - TB67S249 のロジック入力しきい値は High 2.0V以上 / Low 0.8V以下で、3.3V出力で直結可能。
 - ロジック入力（DMODE0〜2、CLK、ENABLE、RESET、CW/CCW、AGC0、AGC1、CLIM0）は内部で 100kΩ によりGNDへプルダウンされている（3.3V入力時の入力電流 33µA）。MCUリセット中（ピンがHi-Z）は、ドライバは **スタンバイ（DMODE=000）・出力OFF** に落ち着く。
-- PC15 は RTC 電源ドメインのピンで駆動能力が小さいため、入力（MO）専用とする。
+- PC15 は RTC 電源ドメインのピンで駆動能力（出力電流・速度）が小さいが、`CAN_S`（TJA1441AT の S）は静的な入力なので問題ない。
+- TJA1441AT の S は内部プルアップ（20〜80kΩ）のため、リセット直後（PC15 が浮いた入力の間）はサイレントモード。ファームウェアは CAN 起動前に PC15 を Low にしてノーマルモードにする。外付け部品は追加しない。
 
 ### 4.1 上位通信用 CAN1（2026-10-17 変更、回路図未反映）
 
@@ -217,14 +220,14 @@ PB8 (45, CAN1_RX) ── CAN_RX ── RXD (4)                       │        
 | 43 | CLK | `DRV_CLK` | — | MCU PA8 |
 | 44 | ENABLE | `DRV_EN` | R16 10kΩ（→`GND`） | MCU PA10 |
 | 45 | RESET | `DRV_RESET` | — | MCU PB15 |
-| 46 | MO | `DRV_MO` | R19 10kΩ（→`+3V3_D`） | MCU PC15、オープンドレイン |
+| 46 | MO | — | — | 未接続（NoConnect）。電気角モニタは使わない |
 | 47 | LO1 | `DRV_LO1` | R17 10kΩ（→`+3V3_D`） | MCU PA2、オープンドレイン |
 | 48 | LO2 | `DRV_LO2` | R18 10kΩ（→`+3V3_D`） | MCU PA3、オープンドレイン |
 | EP | 露出パッド | `GND` | — | コーナーパッドも含めGNDへはんだ付け |
 
 **同名ピンの扱い**：VMA、VMB、OUTA±、OUTB±、RSAGND、RSBGND、VCC の各同名ピンは、ドライバの直近で互いに接続すること（データシート指定）。
 
-**LO1/LO2/MO のプルアップ先**：データシートの推奨はVCCだが、動作範囲上はプルアップ電圧 3.3V（標準）〜VCC（最大）が許容されている。MCU に5Vを入れないため、本設計では `+3V3_D` へプルアップする。
+**LO1/LO2 のプルアップ先**：データシートの推奨はVCCだが、動作範囲上はプルアップ電圧 3.3V（標準）〜VCC（最大）が許容されている。MCU に5Vを入れないため、本設計では `+3V3_D` へプルアップする。MO は未接続のため、プルアップ（旧 R19）は削除済み。
 
 ---
 
@@ -246,7 +249,6 @@ PB8 (45, CAN1_RX) ── CAN_RX ── RXD (4)                       │        
 | R16 | 10kΩ 1% | 0402 | `DRV_EN`–`GND` | ENABLE プルダウン（起動時OFFの二重化） |
 | R17 | 10kΩ 1% | 0402 | `DRV_LO1`–`+3V3_D` | LO1 プルアップ |
 | R18 | 10kΩ 1% | 0402 | `DRV_LO2`–`+3V3_D` | LO2 プルアップ |
-| R19 | 10kΩ 1% | 0402 | `DRV_MO`–`+3V3_D` | MO プルアップ |
 | R20 | 10kΩ 1% | 0402 | `DAC_VREF`–`DRV_VREF` | VREF 分圧（上） |
 | R21 | 9.1kΩ 1% | 0402 | `DRV_VREF`–`GND` | VREF 分圧（下）。7.3節 |
 | C16 | 100nF / 16V X7R | 0402 | `DRV_VREF`–`GND` | VREF フィルタ |
@@ -374,7 +376,7 @@ MCU 起動後の推奨シーケンス：VM 電圧を確認 → DAC を設定 →
 - [ ] NC ピン 7本（9, 12, 25, 28, 36, 37, 38）が未接続である
 - [ ] 同名ピン（VMA×2、VMB×2、OUTA+×2、OUTA−×2、OUTB+×2、OUTB−×2、RSAGND×2、RSBGND×2、VCC×2）がそれぞれ接続されている
 - [ ] `DRV_VCC` が本シート内の R10、R50、R52、R54、R56 以外に接続されていない
-- [ ] LO1・LO2・MO のプルアップ先が `+3V3_D` である（`DRV_VCC` ではない）
+- [ ] LO1・LO2 のプルアップ先が `+3V3_D` である（`DRV_VCC` ではない）
 - [ ] CLIM1・BOOST・FLIM のプルアップ先が `DRV_VCC` である（`+3V3_D` ではない）
 - [ ] VREFA と VREFB が同一ネット `DRV_VREF` で、R20 経由で PA4 に接続されている
 - [ ] PA4 と `DRV_VREF` が直結されていない（必ず R20 を経由する）
@@ -383,7 +385,7 @@ MCU 起動後の推奨シーケンス：VM 電圧を確認 → DAC を設定 →
 - [ ] U1（PCA9615DP）、R2/R3/R5/R7/R10/R11/R15/R18/R19、ネット `I2C_PC_SCL` / `I2C_PC_SDA` / `PCA9615_EN` / `DI2C_*` が回路図から削除されている
 - [ ] `DRV_AGC0` が IC2 PB10（Pin 21）、`DRV_AGC1` が IC2 PB11（Pin 22）に接続されている
 - [ ] `CAN_RX` が IC2 PB8（Pin 45）・IC3 RXD（Pin 4）に、`CAN_TX` が IC2 PB9（Pin 46）・IC3 TXD（Pin 1）に接続されている
-- [ ] IC3 の VCC が `+5V`、VIO が `+3V3`、S が `GND` で、VCC に C41、VIO に C42（各 100nF）がある
+- [ ] IC3 の VCC が `+5V`、VIO が `+3V3`、S が `CAN_S`（IC2 PC15、Pin 4）で、VCC に C41、VIO に C42（各 100nF）がある
 - [ ] 終端 R49 120Ω が SW2（KHS42E）の 4 極目（pin4–pin5）と直列に CANH–CANL 間にあり、TVS D7（PEC3824C2A-AU）が CANH/CANL–GND 間にある
 - [ ] R32（9.1kΩ、DRV_VREF–GND）が DNP になっている（2026-10-17 決定、実機は未実装）
 - [ ] J1/J2 の CANH・CANL・GND が 13.4 節のピン配で並列に接続されている
@@ -507,8 +509,9 @@ PCA9615 による差動 I2C を廃止し、CAN トランシーバ TJA1441AT で�
 | 5 | VIO | `+3V3` | 動作範囲 2.95〜5.5V。C42 100nF/16V X7R（0402）をピン直近に。TJA1441**A** を選ぶのはこのピンで 3.3V MCU と直結するため |
 | 6 | CANL | `CANL` | |
 | 7 | CANH | `CANH` | |
-| 8 | S | `GND` に直結 | **開放禁止**。S は内部プルアップ（20〜80kΩ）で、開放すると High＝サイレントモード（送信不可）になる。Low でノーマルモード |
+| 8 | S | `CAN_S` → IC2 PC15（Pin 4） | S は内部プルアップ（20〜80kΩ）で、High＝サイレントモード（送信不可）、Low＝ノーマルモード。リセット直後（PC15 が浮いた入力の間）はサイレント。ファームウェアが CAN 起動前に PC15 を Low にする |
 
+- トランシーバを変える場合（例：ATA6561）は、S ピン（Pin 8）の仕様を再確認する。
 - TXD がドミナントのまま固まっても、TXD ドミナントタイムアウト（0.8〜9 ms）でバスを解放する。
 - CANH/CANL の最大定格は −36〜+40V（対 GND）、ESD は IEC 61000-4-2 ±8kV。
 - データシート（`datasheet/CAN/tja1441.pdf` Rev.2）にはデカップリング容量の推奨値がないため、一般的な 100nF とした。

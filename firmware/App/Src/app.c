@@ -329,7 +329,7 @@ static uint8_t status_bits(void)
 {
     uint8_t s = 0;
     if (stepper_is_running())                      s |= 1u << 0;
-    if (drv_is_awake() && drv_mo_low())            s |= 1u << 1;
+    /* bit1 は予約（常に 0。MO は廃止） */
     if (board_pwr_external())                      s |= 1u << 2;
     if (ui_sw1())                                  s |= 1u << 3;
     if (ui_sw2())                                  s |= 1u << 4;

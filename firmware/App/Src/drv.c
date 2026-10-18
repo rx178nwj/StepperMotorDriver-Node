@@ -130,11 +130,6 @@ drv_fault_t drv_read_fault(void)
     return DRV_FAULT_NONE;
 }
 
-bool drv_mo_low(void)
-{
-    return !board_pin_read(DRV_MO_PORT, DRV_MO_PIN);
-}
-
 void drv_fault_irq_arm(bool armed)
 {
     __HAL_GPIO_EXTI_CLEAR_IT(DRV_LO1_PIN | DRV_LO2_PIN);
