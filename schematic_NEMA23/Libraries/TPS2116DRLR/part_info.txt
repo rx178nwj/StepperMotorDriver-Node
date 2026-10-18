@@ -1,0 +1,9 @@
+Manufacturer=Texas Instruments
+PartNumber=TPS2116DRLR
+PartCategory=Integrated Circuit
+PackageCategory=Other
+PinCount=8
+Version=2.1
+Released=2021-03-04 10:16:11
+Downloaded=2026-10-03 13:35:44
+3D=Y

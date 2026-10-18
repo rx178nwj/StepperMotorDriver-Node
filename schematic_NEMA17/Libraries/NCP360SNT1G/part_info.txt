@@ -1,0 +1,9 @@
+Manufacturer=onsemi
+PartNumber=NCP360SNT1G
+PartCategory=Integrated Circuit
+PackageCategory=SOT23 (5-Pin)
+PinCount=5
+Version=2.1
+Released=2015-08-17 10:00:36
+Downloaded=2026-10-04 02:57:14
+3D=Y

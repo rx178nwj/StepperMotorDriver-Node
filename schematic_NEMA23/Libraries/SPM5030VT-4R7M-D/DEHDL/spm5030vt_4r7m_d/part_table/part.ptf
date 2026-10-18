@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'SPM5030VT_4R7M_D'
+CLASS = DISCRETE
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET";
+{========================================================================================}
+ "TDK", "SPM5030VT-4R7M-D" (!) = "", "SPM5030VT", "Other", "810-SPM5030VT-4R7M-D", "https://www.mouser.co.uk/ProductDetail/TDK/SPM5030VT-4R7M-D?qs=yqaQSyyJnNiJxBMQBa5s3Q%3D%3D", "Inductors for power circuits, Wound metal, Automotive", "https://product.tdk.com/system/files/dam/doc/product/inductor/inductor/smd/catalog/inductor_automotive_power_spm5030vt-d_en.pdf"
+END_PART
+
+END.

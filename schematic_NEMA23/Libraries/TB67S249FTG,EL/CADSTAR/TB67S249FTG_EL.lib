@@ -1,0 +1,17 @@
+.TB67S249FTG_EL :1 ;Motor / Motion / Ignition Controllers & Drivers Stepping Motor Driver IC 50V 4.5A
+QFN50P700X700X100-49N-D
+*STM IC
+*NGS
+*PLB 1="AGC0" 2="AGC1" 3="CLIM0" 4="CLIM1" 5="FLIM" 6="BOOST" 7="LTH" 8="GND_1" 9="NC_1" 10="VMA_1" 11="VMA_2" 12="NC_2" 13="OUTA+_1" 14="OUTA+_2" 15="RSAGND_1" 16="RSAGND_2" 17="OUTA-_1" 18="OUTA-_2" 19="OUTB-_1" 20="OUTB-_2" 21="RSBGND_1" 22="RSBGND_2" 23="OUTB+_1" 24="OUTB+_2" 25="NC_3" 26="VMB_1" 27="VMB_2" 28="NC_4" 29="GND_2" 30="GND_3" 31="VREFB" 32="VREFA" 33="VCC_1" 34="VCC_2" 35="OSCM" 36="NC_5" 37="NC_6" 38="NC_7" 39="DMODE0" 40="DMODE1" &
+41="DMODE2" 42="CW/CCW" 43="CLK" 44="ENABLE" 45="RESET" 46="MO" 47="LO1" 48="LO2" 49="EP"
+*MXP 49
+*DFN TB67S249FTG_EL
+~!Mouser Part Number (757-TB67S249FTGEL)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/Toshiba/TB67S249FTGEL?qs=1mbolxNpo8fmTK3GoCnwKw%3D%3D)
+~!Manufacturer_Name (Toshiba)
+~!Manufacturer_Part_Number (TB67S249FTG,EL)
+~!Link Datasheet (http://toshiba.semicon-storage.com/info/docget.jsp?did=58560&prodName=TB67S249FTG)
+~!Height (1mm)
+~!3D_Model (TB67S249FTG,EL)
+TB67S249FTG_EL
+1.1!U 2.1!U 3.1!U 4.1!U 5.1!U 6.1!U 7.1!U 8.1!U 9.1!U 10.1!U 11.1!U 12.1!U 13.1!U 14.1!U 15.1!U 16.1!U 17.1!U 18.1!U 19.1!U 20.1!U 21.1!U 22.1!U 23.1!U 24.1!U 36.1!U 35.1!U 34.1!U 33.1!U 32.1!U 31.1!U 30.1!U 29.1!U 28.1!U 27.1!U 26.1!U 25.1!U 49.1!U 48.1!U 47.1!U 46.1!U 45.1!U 44.1!U 43.1!U 42.1!U 41.1!U 40.1!U 39.1!U 38.1!U 37.1!U 

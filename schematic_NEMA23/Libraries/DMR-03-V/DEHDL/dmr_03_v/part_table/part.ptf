@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'DMR_03_V'
+CLASS = DISCRETE
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "Diptronics", "DMR-03-V" (!) = "", "DMR03V", "Other", "113-DMR03V", "https://www.mouser.co.uk/ProductDetail/Diptronics/DMR-03-V?qs=MLItCLRbWszPD8Gf56uzfQ%3D%3D", "DIP Switches  3 Position 3PST SMD/SMT 24 VDC 25 mA", "", "4.4 mm"
+END_PART
+
+END.

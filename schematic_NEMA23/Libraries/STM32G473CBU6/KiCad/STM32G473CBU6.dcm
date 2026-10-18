@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP STM32G473CBU6
+D Arm Cortex-M4 32-bit MCU+FPU, up to 512 KB Flash, 170 MHz / 213DMIPS, 128 KB SRAM, rich analog, math accelerator
+K
+F https://www.st.com/resource/en/datasheet/stm32g473cb.pdf
+$ENDCMP
+#
+#End Doc Library

@@ -1,0 +1,9 @@
+Manufacturer=Texas Instruments
+PartNumber=TMUX1511RSVR
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=16
+Version=1.1
+Released=2019-03-20 03:38:22
+Downloaded=2026-10-04 02:37:53
+3D=Y

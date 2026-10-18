@@ -1,0 +1,52 @@
+{
+    // 書き込み用タスク（ビルドは ST 拡張 / CMake Tools で行う）
+    // STM32_Programmer_CLI は拡張のバンドル管理が入れたもの。バージョンを上げたらパスも更新する。
+    // 書き込みは対象セクタだけを消去するので、Flash 末尾の設定保存領域（0x0803F000〜）は消えない。
+    "version": "2.0.0",
+    "options": {
+        "env": {
+            "STM32_PROG": "${env:LOCALAPPDATA}\\stm32cube\\bundles\\programmer\\2.23.0\\bin\\STM32_Programmer_CLI.exe"
+        }
+    },
+    "tasks": [
+        {
+            "label": "Flash (USB DFU) - Debug",
+            "detail": "S3(BOOT0) を押したまま S1(リセット) で DFU モードにしてから実行",
+            "type": "shell",
+            "command": "& $env:STM32_PROG -c port=usb1 -w build/Debug/driver_fw.elf -v -g 0x08000000",
+            "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+            "problemMatcher": []
+        },
+        {
+            "label": "Flash (USB DFU) - Release",
+            "detail": "S3(BOOT0) を押したまま S1(リセット) で DFU モードにしてから実行",
+            "type": "shell",
+            "command": "& $env:STM32_PROG -c port=usb1 -w build/Release/driver_fw.elf -v -g 0x08000000",
+            "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+            "problemMatcher": []
+        },
+        {
+            "label": "Flash (ST-LINK) - Debug",
+            "type": "shell",
+            "command": "& $env:STM32_PROG -c port=SWD mode=UR -w build/Debug/driver_fw.elf -v -rst",
+            "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+            "problemMatcher": []
+        },
+        {
+            "label": "DFU: list devices",
+            "detail": "DFU モードの基板が認識されているか確認",
+            "type": "shell",
+            "command": "& $env:STM32_PROG -l usb",
+            "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+            "problemMatcher": []
+        },
+        {
+            "label": "Read bootloader version ID (ST-LINK)",
+            "detail": "0x1FFF6FF2 を読む。0x10 なら ROM DFU 問題なし、0xFF は USB-DFU に CRS 不具合あり（AN2606）",
+            "type": "shell",
+            "command": "& $env:STM32_PROG -c port=SWD -r8 0x1FFF6FF2 1",
+            "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+            "problemMatcher": []
+        }
+    ]
+}

@@ -1,0 +1,16 @@
+.SKRKAEE020 :1 ;Tactile Switches 3.9x2.9x2.0mm 160gf Packaging Temp 80oC
+SKRKAEE020
+*STM S
+*NGS
+*PLB 1="1" 2="2"
+*MXP 2
+*DFN SKRKAEE020
+~!Mouser Part Number (688-SKRKAEE020)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/Alps-Alpine/SKRKAEE020?qs=MrosSN5%252BUQW89XjXIp8Ugw%3D%3D)
+~!Manufacturer_Name (ALPS Electric)
+~!Manufacturer_Part_Number (SKRKAEE020)
+~!Link Datasheet (http://www.alps.com/prod/info/J/HTML/Tact/SurfaceMount/SKRK/SKRKAEE020.html)
+~!Height (2mm)
+~!3D_Model (SKRKAEE020)
+SKRKAEE020
+1.1!U 2.1!U 

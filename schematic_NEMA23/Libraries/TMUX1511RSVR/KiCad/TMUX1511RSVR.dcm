@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP TMUX1511RSVR
+D Low-capacitance, 1:1 (SPST) 4-channel, powered-off protection switch with 1.8-V logic
+K
+F http://www.ti.com/lit/ds/symlink/tmux1511.pdf
+$ENDCMP
+#
+#End Doc Library

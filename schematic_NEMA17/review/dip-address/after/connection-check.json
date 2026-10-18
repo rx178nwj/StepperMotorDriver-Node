@@ -1,0 +1,69 @@
+{
+  "target_address_memberships": 9,
+  "preserved_other_memberships": 412,
+  "dip_contact_pairs": [
+    [
+      1,
+      6
+    ],
+    [
+      2,
+      5
+    ],
+    [
+      3,
+      4
+    ]
+  ],
+  "settings": [
+    {
+      "ADDR2": 0,
+      "ADDR1": 0,
+      "ADDR0": 0,
+      "node_id": 0
+    },
+    {
+      "ADDR2": 0,
+      "ADDR1": 0,
+      "ADDR0": 1,
+      "node_id": 1
+    },
+    {
+      "ADDR2": 0,
+      "ADDR1": 1,
+      "ADDR0": 0,
+      "node_id": 2
+    },
+    {
+      "ADDR2": 0,
+      "ADDR1": 1,
+      "ADDR0": 1,
+      "node_id": 3
+    },
+    {
+      "ADDR2": 1,
+      "ADDR1": 0,
+      "ADDR0": 0,
+      "node_id": 4
+    },
+    {
+      "ADDR2": 1,
+      "ADDR1": 0,
+      "ADDR0": 1,
+      "node_id": 5
+    },
+    {
+      "ADDR2": 1,
+      "ADDR1": 1,
+      "ADDR0": 0,
+      "node_id": 6
+    },
+    {
+      "ADDR2": 1,
+      "ADDR1": 1,
+      "ADDR0": 1,
+      "node_id": 7
+    }
+  ],
+  "failures": []
+}

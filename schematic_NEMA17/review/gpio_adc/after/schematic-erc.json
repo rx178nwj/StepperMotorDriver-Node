@@ -1,0 +1,204 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-10-04T14:08:33",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.0.4",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/9fdd081c-730e-4fc3-b866-b3cdf49e5309",
+            "violations": [
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'L0'",
+                            "pos": {
+                                "x": 1.2573,
+                                "y": 2.5527
+                            },
+                            "uuid": "887a5395-1561-43b0-ab0f-db080c405196"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'ENABLE'",
+                            "pos": {
+                                "x": 1.397,
+                                "y": 2.3368
+                            },
+                            "uuid": "2d5762a9-457c-413a-b799-95168121018c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'DMODE_EN'",
+                            "pos": {
+                                "x": 1.524,
+                                "y": 2.3368
+                            },
+                            "uuid": "cb84e580-4356-415b-a16d-0ad7d741a79c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'nFAULT'",
+                            "pos": {
+                                "x": 1.7272,
+                                "y": 2.3876
+                            },
+                            "uuid": "6b266b13-5dfc-49b3-908f-da696650b90b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "LO0 と nFAULT は、ともに同じ配線に接続されています; LO0 をネットリスト用ラベルとして選択しました",
+                    "items": [
+                        {
+                            "description": "ラベル 'LO0'",
+                            "pos": {
+                                "x": 1.7272,
+                                "y": 2.5908
+                            },
+                            "uuid": "eb06474c-0fab-41b8-9d50-12a4039e360e"
+                        },
+                        {
+                            "description": "ラベル 'nFAULT'",
+                            "pos": {
+                                "x": 1.7272,
+                                "y": 2.3876
+                            },
+                            "uuid": "6b266b13-5dfc-49b3-908f-da696650b90b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "multiple_net_names"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'LO0'",
+                            "pos": {
+                                "x": 1.7272,
+                                "y": 2.5908
+                            },
+                            "uuid": "eb06474c-0fab-41b8-9d50-12a4039e360e"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'LO1'",
+                            "pos": {
+                                "x": 1.7907,
+                                "y": 2.5908
+                            },
+                            "uuid": "99c2fcd7-ce47-48d5-b7ba-7a5bcf5b6663"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "VBUS と USB_VBUS は、ともに同じ配線に接続されています; VBUS をネットリスト用ラベルとして選択しました",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR053 非表示ピン 1 [VBUS, Power input, Line]",
+                            "pos": {
+                                "x": 6.5405,
+                                "y": 0.9525
+                            },
+                            "uuid": "aa5313fc-b703-4780-8deb-4af06313ef55"
+                        },
+                        {
+                            "description": "ラベル 'USB_VBUS'",
+                            "pos": {
+                                "x": 5.9182,
+                                "y": 1.3716
+                            },
+                            "uuid": "0af61450-0e86-47f2-be9a-05018202844f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "multiple_net_names"
+                },
+                {
+                    "description": "現在の構成にはシンボル ライブラリ 'USB Protection' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル U20 [NCP360]",
+                            "pos": {
+                                "x": 6.3119,
+                                "y": 1.0414
+                            },
+                            "uuid": "518f27e0-eba5-4b14-9a18-d8ddb3734d4c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_issues"
+                },
+                {
+                    "description": "シンボル 'VBUS' が、ライブラリ 'power' のコピーと一致しません",
+                    "items": [
+                        {
+                            "description": "シンボル #PWR053 [VBUS]",
+                            "pos": {
+                                "x": 6.5405,
+                                "y": 0.9525
+                            },
+                            "uuid": "f19c3dc1-6283-4d58-94a9-b1a06d41361c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        }
+    ],
+    "source": "schematic.kicad_sch"
+}

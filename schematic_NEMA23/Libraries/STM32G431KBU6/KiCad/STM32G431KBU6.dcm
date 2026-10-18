@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP STM32G431KBU6
+D Arm Cortex-M4 32-bit MCU+FPU, 170 MHz /213 DMIPS, up to 128 KB Flash, 32 KB SRAM, rich analog, math accelerator
+K
+F https://www.st.com/resource/en/datasheet/stm32g431c6.pdf
+$ENDCMP
+#
+#End Doc Library

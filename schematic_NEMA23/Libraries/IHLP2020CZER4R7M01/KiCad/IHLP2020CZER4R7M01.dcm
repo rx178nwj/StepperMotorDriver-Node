@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP IHLP2020CZER4R7M01
+D Vishay IHLP2020CZ-01 Series Shielded Wire-wound SMD Inductor 4.7 uH +/-20% 8.2A Idc
+K
+F https://www.vishay.com/docs/34563/ihlp-2020cz-8a.pdf
+$ENDCMP
+#
+#End Doc Library

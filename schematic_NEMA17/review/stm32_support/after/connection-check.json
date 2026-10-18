@@ -1,0 +1,7 @@
+{
+  "checked_nets": 15,
+  "checked_connections": 69,
+  "preserved_existing_nodes": 375,
+  "intentional_removal": "R2 and unused separate VREF+ branch",
+  "failures": []
+}

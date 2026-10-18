@@ -1,0 +1,422 @@
+{
+  "components": 122,
+  "nets": 98,
+  "expected_nets": 63,
+  "expected_memberships": 223,
+  "checks": [
+    {
+      "net": "+3V3",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "GND",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "GNDA",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "GNDPWR",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "VM",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "+5V_EXT",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "+5V",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "BUCK_SW",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "BUCK_BOOT",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "POWER_PR1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "PWR_ST",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_VBUS_SRC",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_VBUS",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_PC_DP",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_PC_DM",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_CC1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "USB_CC2",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "VDDA",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "NRST",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "PB8_BOOT",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "SWDIO",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "SWCLK",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "SWO",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "VM_DIV",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "VM_SENSE_ISO",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "VM_SENSE",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "I2C_PC_SCL",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "I2C_PC_SDA",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "I2C_SENS_SCL",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "I2C_SENS_SDA",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DAC_VREF",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_VREF",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_VCC",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_OSCM",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_LTH",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_CLIM0",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_CLIM1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_BOOST",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_FLIM",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_CLK",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_DIR",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_EN",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_RESET",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_DMODE0",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_DMODE1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_DMODE2",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_AGC0",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_AGC1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_LO1",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_LO2",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "DRV_MO",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "OUTA_P",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "OUTA_N",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "OUTB_N",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "OUTB_P",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "LED_RUN",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "Net-(D1-A)",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "LED_FAULT",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "Net-(D2-A)",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "LED_MCU",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "Net-(D3-A)",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "LED_COMM",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "net": "Net-(D5-A)",
+      "pass": true,
+      "missing": []
+    },
+    {
+      "isolated_pin": "IC2.9",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.12",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.25",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.28",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.36",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.37",
+      "pass": true
+    },
+    {
+      "isolated_pin": "IC2.38",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U8.6",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U8.7",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U8.9",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U8.12",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U8.13",
+      "pass": true
+    },
+    {
+      "isolated_pin": "U7.4",
+      "pass": true
+    }
+  ],
+  "connectivity_failures": [],
+  "functional_findings": {
+    "communication_supply_isolated_from_local_5V": true,
+    "communication_supply_members": [
+      "C11.1",
+      "J1.1",
+      "J3.1",
+      "R13.1",
+      "R16.1",
+      "U2.10"
+    ],
+    "signals_without_mcu": {
+      "SWITCH1": [
+        "C7.1",
+        "R4.2",
+        "SW2.1",
+        "SW2.2"
+      ],
+      "SWITCH2": [
+        "C8.1",
+        "R5.2",
+        "SW3.1",
+        "SW3.2"
+      ],
+      "TEMP": [
+        "C9.1",
+        "R7.2",
+        "TH1.1"
+      ]
+    },
+    "missing_documented_input_protection": [
+      "F1",
+      "Q1",
+      "D6",
+      "D7",
+      "R38"
+    ],
+    "driver_nc_isolated": true
+  },
+  "calculations": {
+    "vref_max_nominal_V": 1.5722513089005232,
+    "current_max_nominal_A": 1.965314136125654,
+    "vm_adc_at_24V": 1.263157894736842,
+    "vm_filter_tau_s": 0.0014173684210526314,
+    "power_led_resistor_W_at_24V_Vf2V": 0.14666666666666667,
+    "power_mux_switch_nominal_V": 4.322259136212624
+  }
+}

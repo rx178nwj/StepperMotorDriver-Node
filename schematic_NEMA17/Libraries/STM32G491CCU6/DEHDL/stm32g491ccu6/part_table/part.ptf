@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'STM32G491CCU6'
+CLASS = IC
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "STMicroelectronics", "STM32G491CCU6" (!) = "", "QFN50P700X700X60-49N-D", "Quad Flat No-Lead", "511-STM32G491CCU6", "https://www.mouser.co.uk/ProductDetail/STMicroelectronics/STM32G491CCU6?qs=eP2BKZSCXI7DW1LAe4ydBg%3D%3D", "Arm Cortex-M4 32-bit MCU+FPU, 170 MHz / 213 DMIPS, up to 512 KB Flash, 112 KB SRAM, rich analog, math accelerator", "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf", "0.6 mm"
+END_PART
+
+END.

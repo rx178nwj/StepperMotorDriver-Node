@@ -1,0 +1,13 @@
+(unit MM)
+
+(package "SPM5030VT-4R7M-D"
+    (type UNDEF)
+    (uver 2)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (utime 2021-06-24-12:28:39)
+    (mountForm default
+        (footprintRef "SPM5030VT")
+        (spec "System")
+    )
+)

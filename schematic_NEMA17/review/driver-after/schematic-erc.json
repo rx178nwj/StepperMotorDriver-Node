@@ -1,0 +1,856 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-10-02T23:24:25",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.0.4",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/9fdd081c-730e-4fc3-b866-b3cdf49e5309",
+            "violations": [
+                {
+                    "description": "Label not connected",
+                    "items": [
+                        {
+                            "description": "ラベル 'RESET'",
+                            "pos": {
+                                "x": 2.413,
+                                "y": 1.1811
+                            },
+                            "uuid": "f4e6ed93-9401-4710-9617-b4ec7c0d6889"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "label_dangling"
+                },
+                {
+                    "description": "Label not connected",
+                    "items": [
+                        {
+                            "description": "ラベル 'DMODE0'",
+                            "pos": {
+                                "x": 2.4511,
+                                "y": 1.1811
+                            },
+                            "uuid": "56d358be-f4a5-4a85-a9df-773698519c19"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "label_dangling"
+                },
+                {
+                    "description": "Label not connected",
+                    "items": [
+                        {
+                            "description": "ラベル 'DMODE1'",
+                            "pos": {
+                                "x": 2.4892,
+                                "y": 1.1811
+                            },
+                            "uuid": "5c5dd9e0-354b-4128-ab05-33f1c014693c"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "label_dangling"
+                },
+                {
+                    "description": "Label not connected",
+                    "items": [
+                        {
+                            "description": "ラベル 'DMODE2'",
+                            "pos": {
+                                "x": 2.5273,
+                                "y": 1.1811
+                            },
+                            "uuid": "2c4a24d1-2e45-4f46-8d98-d09bc554ec2d"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "label_dangling"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC1 ピン 30 [PB7, Passive, Line]",
+                            "pos": {
+                                "x": 2.7559,
+                                "y": 0.5588
+                            },
+                            "uuid": "7ec3b988-173f-40a6-8169-8c25b9244d07"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR010 ピン 1 [Power input, Line]",
+                            "pos": {
+                                "x": 2.8067,
+                                "y": 1.27
+                            },
+                            "uuid": "6367a700-6a6b-4a23-9c10-7e92e38b9bf8"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR02 ピン 1 [Power input, Line]",
+                            "pos": {
+                                "x": 3.3655,
+                                "y": 0.2667
+                            },
+                            "uuid": "a5d5f2fe-da2f-4d68-94b1-b7092d03b445"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol #PWR01 ピン 1 [Power input, Line]",
+                            "pos": {
+                                "x": 3.3655,
+                                "y": 0.3937
+                            },
+                            "uuid": "a4bbc354-a8d4-4abf-b512-02d51fe7d04d"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 5 [PH0-OSC_IN_(PH0), Passive, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.6543
+                            },
+                            "uuid": "2f645c18-c7bd-415d-aea1-31289f5c6574"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 6 [PH1-OSC_OUT_(PH1), Passive, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.6797
+                            },
+                            "uuid": "75a4a3e3-53ae-4520-a48f-9bd095408c74"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 7 [NRST, Passive, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7051
+                            },
+                            "uuid": "eb2cbcdc-58fe-4d76-837b-7abfdab0c733"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 8 [VSSA/VREF-, Power input, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7305
+                            },
+                            "uuid": "080ae848-2954-46d7-bdf7-78f6fa2ffce3"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 8 [VSSA/VREF-, Power input, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7305
+                            },
+                            "uuid": "080ae848-2954-46d7-bdf7-78f6fa2ffce3"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 9 [VDDA/VREF+, Power input, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7559
+                            },
+                            "uuid": "46e10eef-f039-43d1-8f84-e17ec83ef7ea"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Input Power pin not driven by any Output Power pins",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 9 [VDDA/VREF+, Power input, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7559
+                            },
+                            "uuid": "46e10eef-f039-43d1-8f84-e17ec83ef7ea"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "power_pin_not_driven"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 10 [PA0, Passive, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.7813
+                            },
+                            "uuid": "dfa9847b-6f5b-4f88-a096-e72bf816f995"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 11 [PA1, Passive, Line]",
+                            "pos": {
+                                "x": 3.5433,
+                                "y": 2.8067
+                            },
+                            "uuid": "b2baab01-f8c0-4ffc-bd0c-3fe7469467f1"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 15 [PA5, Passive, Line]",
+                            "pos": {
+                                "x": 3.7719,
+                                "y": 3.0099
+                            },
+                            "uuid": "4e2eef0f-c876-4d6e-97e3-42e2aff27837"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 16 [PA6, Passive, Line]",
+                            "pos": {
+                                "x": 3.7973,
+                                "y": 3.0099
+                            },
+                            "uuid": "7e2b5926-290a-4365-8966-a88fe8275979"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 17 [PA7, Passive, Line]",
+                            "pos": {
+                                "x": 3.8227,
+                                "y": 3.0099
+                            },
+                            "uuid": "c218e005-e8a0-40b0-b1ba-05d697366150"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 44 [PH3-BOOT0, Passive, Line]",
+                            "pos": {
+                                "x": 3.8481,
+                                "y": 2.1971
+                            },
+                            "uuid": "54bce73e-df53-448c-bd69-9b193193192e"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 18 [PB0, Passive, Line]",
+                            "pos": {
+                                "x": 3.8481,
+                                "y": 3.0099
+                            },
+                            "uuid": "f7bae4e3-5630-470f-bb1b-45dbfc6bd6d3"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 43 [PB7, Passive, Line]",
+                            "pos": {
+                                "x": 3.8735,
+                                "y": 2.1971
+                            },
+                            "uuid": "02518852-0966-4b66-b644-ac96347c5a22"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 19 [PB1, Passive, Line]",
+                            "pos": {
+                                "x": 3.8735,
+                                "y": 3.0099
+                            },
+                            "uuid": "058eb065-33a1-4ef2-b423-51ed34b2ee25"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 42 [PB6, Passive, Line]",
+                            "pos": {
+                                "x": 3.8989,
+                                "y": 2.1971
+                            },
+                            "uuid": "5b3eaf35-a1bd-4dce-b32d-f67f7026b8a0"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 20 [PB2, Passive, Line]",
+                            "pos": {
+                                "x": 3.8989,
+                                "y": 3.0099
+                            },
+                            "uuid": "fd9368c4-39c0-4622-a39a-71cc2b6c66df"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 41 [PB5, Passive, Line]",
+                            "pos": {
+                                "x": 3.9243,
+                                "y": 2.1971
+                            },
+                            "uuid": "f2fd07b3-1849-4c9e-b95a-e9daf6e068bb"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 21 [PB10, Passive, Line]",
+                            "pos": {
+                                "x": 3.9243,
+                                "y": 3.0099
+                            },
+                            "uuid": "bbbef1cd-6a2b-4f81-b1f5-13a80860c6d2"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 40 [PB4_(NJTRST), Passive, Line]",
+                            "pos": {
+                                "x": 3.9497,
+                                "y": 2.1971
+                            },
+                            "uuid": "5c22ad48-05e9-49e5-b4d8-934aa9fb01c4"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 22 [PB11, Passive, Line]",
+                            "pos": {
+                                "x": 3.9497,
+                                "y": 3.0099
+                            },
+                            "uuid": "7e7135ab-c2d9-4603-b686-1f6b0f039e53"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 39 [PB3_(JTDO-TRACESWO), Passive, Line]",
+                            "pos": {
+                                "x": 3.9751,
+                                "y": 2.1971
+                            },
+                            "uuid": "ab9419d9-8e57-4ab4-b41e-c7b3822c0f1e"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 38 [PA15_(JTDI), Passive, Line]",
+                            "pos": {
+                                "x": 4.0005,
+                                "y": 2.1971
+                            },
+                            "uuid": "ad8f963b-60f2-4753-97dc-04555a1c0ac1"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 37 [PA14_(JTCK-SWCLK), Passive, Line]",
+                            "pos": {
+                                "x": 4.0259,
+                                "y": 2.1971
+                            },
+                            "uuid": "b9f345c2-5893-41db-b8f7-d990b8a8e4b8"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Pin not connected",
+                    "items": [
+                        {
+                            "description": "Symbol IC4 ピン 34 [PA13_(JTMS-SWDIO), Passive, Line]",
+                            "pos": {
+                                "x": 4.2037,
+                                "y": 2.6035
+                            },
+                            "uuid": "c27cd77b-ed76-4412-a126-35a529493bf1"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_not_connected"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'L0'",
+                            "pos": {
+                                "x": 1.2573,
+                                "y": 2.5527
+                            },
+                            "uuid": "887a5395-1561-43b0-ab0f-db080c405196"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "現在の構成にはフットプリント ライブラリ '' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル J3 [Conn_01x06]",
+                            "pos": {
+                                "x": 2.2225,
+                                "y": 0.4445
+                            },
+                            "uuid": "5742c6dc-1520-4f65-a188-5264fbae04d6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'LED1'",
+                            "pos": {
+                                "x": 2.4892,
+                                "y": 0.8382
+                            },
+                            "uuid": "f1257cdf-7786-44d0-b6d2-49921339f479"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'DIR'",
+                            "pos": {
+                                "x": 2.4892,
+                                "y": 0.9398
+                            },
+                            "uuid": "a7f162fe-03cc-4e3d-ab40-c3d54017dec8"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "現在の構成にはフットプリント ライブラリ '' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル IC1 [STM32G441KBU6]",
+                            "pos": {
+                                "x": 2.5781,
+                                "y": 0.7874
+                            },
+                            "uuid": "bc32b4a4-bed9-432b-a205-992010195c56"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'VREF'",
+                            "pos": {
+                                "x": 2.6797,
+                                "y": 1.2573
+                            },
+                            "uuid": "650109c9-7ddd-4213-9b40-1267189136e1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'VM_SENSE'",
+                            "pos": {
+                                "x": 2.7051,
+                                "y": 1.2573
+                            },
+                            "uuid": "b54e3a9d-3c83-444d-a256-f5a565c6c7e1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "LO0 と nFAULT は、ともに同じ配線に接続されています; LO0 をネットリスト用ラベルとして選択しました",
+                    "items": [
+                        {
+                            "description": "ラベル 'LO0'",
+                            "pos": {
+                                "x": 1.7272,
+                                "y": 2.5908
+                            },
+                            "uuid": "eb06474c-0fab-41b8-9d50-12a4039e360e"
+                        },
+                        {
+                            "description": "ラベル 'nFAULT'",
+                            "pos": {
+                                "x": 2.7559,
+                                "y": 1.2573
+                            },
+                            "uuid": "20095d61-a98a-4b06-bdb0-21fc3cce7fc0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "multiple_net_names"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'VBUS_SENSE'",
+                            "pos": {
+                                "x": 2.7813,
+                                "y": 0.4318
+                            },
+                            "uuid": "5abaedd7-e704-4bd6-8415-ea5679b097e4"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'ADDR1'",
+                            "pos": {
+                                "x": 2.8067,
+                                "y": 0.4318
+                            },
+                            "uuid": "ef237147-566f-43c0-b534-a552da679646"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'ADDR0'",
+                            "pos": {
+                                "x": 2.8321,
+                                "y": 0.4318
+                            },
+                            "uuid": "c32e4797-9b02-401d-880c-00f835e11095"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'INT'",
+                            "pos": {
+                                "x": 2.8575,
+                                "y": 0.4318
+                            },
+                            "uuid": "dc94e1e4-67ce-44a3-bbfa-3c1936a1ca0a"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'ENC_SCL'",
+                            "pos": {
+                                "x": 2.8829,
+                                "y": 0.4318
+                            },
+                            "uuid": "79c78103-a0bb-498b-b05c-69c9e0d68b23"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'SWCLK'",
+                            "pos": {
+                                "x": 3.0988,
+                                "y": 0.7874
+                            },
+                            "uuid": "51be6b8e-713e-4439-9be6-76d8269eb63b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'SWDIO'",
+                            "pos": {
+                                "x": 3.0988,
+                                "y": 0.8128
+                            },
+                            "uuid": "57b40818-8fcb-49da-9362-cc07cfe9a34d"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'USB_DP'",
+                            "pos": {
+                                "x": 3.0988,
+                                "y": 0.8382
+                            },
+                            "uuid": "aae1dc9d-814b-45b8-aee7-e86b3cdce3da"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'USB_DM'",
+                            "pos": {
+                                "x": 3.0988,
+                                "y": 0.8636
+                            },
+                            "uuid": "ab324dfa-492b-4b61-95cf-da7844c9f4cb"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'STEP'",
+                            "pos": {
+                                "x": 3.0988,
+                                "y": 0.889
+                            },
+                            "uuid": "3d734a53-f95e-4ad2-b1e9-0e0b890e63ec"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'VREF+'",
+                            "pos": {
+                                "x": 3.3147,
+                                "y": 0.5334
+                            },
+                            "uuid": "0ca0724f-fec1-401b-beae-ac1e23531e43"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "ラベル 'ADDR2'",
+                            "pos": {
+                                "x": 3.5306,
+                                "y": 2.5781
+                            },
+                            "uuid": "4caaf95f-af1f-4c76-ac64-76befc30843a"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                }
+            ]
+        }
+    ],
+    "source": "schematic.kicad_sch"
+}

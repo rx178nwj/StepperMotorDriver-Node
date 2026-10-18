@@ -1,0 +1,66 @@
+*PADS-LIBRARY-PART-TYPES-V9*
+
+TB67S249FTG_EL QFN50P700X700X100-49N-D I ANA 7 1 0 0 0
+TIMESTAMP 2026.10.01.16.23.22
+"Mouser Part Number" 757-TB67S249FTGEL
+"Mouser Price/Stock" https://www.mouser.co.uk/ProductDetail/Toshiba/TB67S249FTGEL?qs=1mbolxNpo8fmTK3GoCnwKw%3D%3D
+"Manufacturer_Name" Toshiba
+"Manufacturer_Part_Number" TB67S249FTG,EL
+"Description" Motor / Motion / Ignition Controllers & Drivers Stepping Motor Driver IC 50V 4.5A
+"Datasheet Link" http://toshiba.semicon-storage.com/info/docget.jsp?did=58560&prodName=TB67S249FTG
+"Geometry.Height" 1mm
+GATE 1 49 0
+TB67S249FTG_EL
+1 0 U AGC0
+2 0 U AGC1
+3 0 U CLIM0
+4 0 U CLIM1
+5 0 U FLIM
+6 0 U BOOST
+7 0 U LTH
+8 0 U GND_1
+9 0 U NC_1
+10 0 U VMA_1
+11 0 U VMA_2
+12 0 U NC_2
+13 0 U OUTA+_1
+14 0 U OUTA+_2
+15 0 U RSAGND_1
+16 0 U RSAGND_2
+17 0 U OUTA-_1
+18 0 U OUTA-_2
+19 0 U OUTB-_1
+20 0 U OUTB-_2
+21 0 U RSBGND_1
+22 0 U RSBGND_2
+23 0 U OUTB+_1
+24 0 U OUTB+_2
+36 0 U NC_5
+35 0 U OSCM
+34 0 U VCC_2
+33 0 U VCC_1
+32 0 U VREFA
+31 0 U VREFB
+30 0 U GND_3
+29 0 U GND_2
+28 0 U NC_4
+27 0 U VMB_2
+26 0 U VMB_1
+25 0 U NC_3
+49 0 U EP
+48 0 U LO2
+47 0 U LO1
+46 0 U MO
+45 0 U RESET
+44 0 U ENABLE
+43 0 U CLK
+42 0 U CW/CCW
+41 0 U DMODE2
+40 0 U DMODE1
+39 0 U DMODE0
+38 0 U NC_7
+37 0 U NC_6
+
+*END*
+*REMARK* SamacSys ECAD Model
+931774/796352/2.50/49/4/Integrated Circuit

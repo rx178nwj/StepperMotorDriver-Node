@@ -1,0 +1,66 @@
+(Japanese_coding: sjis)
+(function "ECS_901073"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2018-03-28-15:04:28)
+    (utime 2023-03-07-16:10:32)
+    (interface
+        (port "1" (symbPinId 1) (portType INOUT))
+        (port "2" (symbPinId 2) (portType INOUT))
+    )
+    (property "symbolName" "SKRKAEE020")
+)
+
+
+(pinAssign "ECS_901073"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2018-03-28-15:04:28)
+    (utime 2023-03-07-16:10:32)
+    (interface
+        (port "1" (symbPinId 1) (portName "1") (portType INOUT))
+        (port "2" (symbPinId 2) (portName "2") (portType INOUT))
+    )
+    (internal
+        (funcInst (functionRef "ECS_901073")
+                (port "1" (match "1"))
+                (port "2" (match "2"))
+        )
+    )
+    (property "usePowerBox" "No")
+    (property "symbolName" "SKRKAEE020")
+)
+
+
+(part "SKRKAEE020"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2018-03-28-15:04:28)
+    (utime 2023-03-07-16:10:32)
+    (packageRef "SKRKAEE020")
+    (pinAssignRef "ECS_901073")
+    (interface
+        (port "1" (symbPinId 1) (portName "1") (portType INOUT))
+        (port "2" (symbPinId 2) (portName "2") (portType INOUT))
+    )
+    (partClass UNDEF)
+    (useInSchema Y)
+    (useInLayout Y)
+    (inPartsList Y)
+    (partType NORMAL)
+    (placeRestriction FREE)
+    (property "enetNonSeries" "YES")
+    (property "refDesPrefix" "S")
+    (property "description" "Tactile Switches 3.9x2.9x2.0mm 160gf Packaging Temp 80oC")
+    (property "Mouser_Part_Number" "688-SKRKAEE020")
+    (property "Mouser_Price/Stock" "https://www.mouser.co.uk/ProductDetail/Alps-Alpine/SKRKAEE020?qs=MrosSN5%252BUQW89XjXIp8Ugw%3D%3D")
+    (property "Manufacturer_Name" "ALPS Electric")
+    (property "Manufacturer_Part_Number" "SKRKAEE020")
+    (property "Datasheet_Link" "http://www.alps.com/prod/info/J/HTML/Tact/SurfaceMount/SKRK/SKRKAEE020.html")
+    (property "compAreaTopHeight" 2)
+)
+
+

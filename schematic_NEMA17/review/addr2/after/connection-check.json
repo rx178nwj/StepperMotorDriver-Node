@@ -1,0 +1,11 @@
+{
+  "preserved_existing_memberships": 414,
+  "addr2": [
+    "IC4.2",
+    "JP1.1",
+    "R58.1"
+  ],
+  "jumper_supply": "+3V3",
+  "closed_pull_down_current_mA": 0.33,
+  "failures": []
+}

@@ -1,0 +1,9 @@
+Manufacturer=STMicroelectronics
+PartNumber=STM32G441KBU6
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=33
+Version=2.1
+Released=2020-07-16 10:20:52
+Downloaded=2026-09-27 12:35:11
+3D=Y

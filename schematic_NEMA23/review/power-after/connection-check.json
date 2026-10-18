@@ -1,0 +1,21 @@
+{
+  "expected_pin_memberships": 95,
+  "preserved_existing_pin_memberships": 296,
+  "power_rails_distinct": [
+    "VIN_RAW",
+    "VIN_FUSED",
+    "VM",
+    "+5V_EXT",
+    "USB_VBUS",
+    "+5V",
+    "+3V3"
+  ],
+  "grounds_distinct": [
+    "GNDPWR",
+    "GND",
+    "GNDA"
+  ],
+  "DRV_VCC_unchanged": true,
+  "failure_count": 0,
+  "failures": []
+}

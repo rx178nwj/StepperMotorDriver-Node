@@ -1,0 +1,9 @@
+Manufacturer=Toshiba
+PartNumber=TB67S249FTG,EL
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=49
+Version=1.1
+Released=2018-05-19 12:10:10
+Downloaded=2026-10-01 16:23:22
+3D=Y

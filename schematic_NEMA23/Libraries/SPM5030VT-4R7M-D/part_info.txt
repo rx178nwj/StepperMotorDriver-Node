@@ -1,0 +1,9 @@
+Manufacturer=TDK
+PartNumber=SPM5030VT-4R7M-D
+PartCategory=Inductor (FeSi Core)
+PackageCategory=Other
+PinCount=2
+Version=2.1
+Released=2021-06-24 12:28:39
+Downloaded=2026-10-03 08:23:11
+3D=Y

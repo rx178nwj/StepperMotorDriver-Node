@@ -1,0 +1,16 @@
+.SPM5030VT-4R7M-D :1 ;Inductors for power circuits, Wound metal, Automotive
+SPM5030VT
+*STM L
+*NGS
+*PLB 1="1" 2="2"
+*MXP 2
+*DFN SPM5030VT-4R7M-D
+~!Mouser Part Number (810-SPM5030VT-4R7M-D)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/TDK/SPM5030VT-4R7M-D?qs=yqaQSyyJnNiJxBMQBa5s3Q%3D%3D)
+~!Manufacturer_Name (TDK)
+~!Manufacturer_Part_Number (SPM5030VT-4R7M-D)
+~!Link Datasheet (https://product.tdk.com/system/files/dam/doc/product/inductor/inductor/smd/catalog/inductor_automotive_power_spm5030vt-d_en.pdf)
+~!Height (-)
+~!3D_Model (SPM5030VT-4R7M-D)
+SPM5030VT-4R7M-D
+1.1!U 2.1!U 

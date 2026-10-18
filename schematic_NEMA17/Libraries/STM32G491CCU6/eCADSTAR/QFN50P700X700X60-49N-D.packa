@@ -1,0 +1,13 @@
+(unit MM)
+
+(package "STM32G491CCU6"
+    (type UNDEF)
+    (uver 2)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (utime 2019-07-07-09:42:10)
+    (mountForm default
+        (footprintRef "QFN50P700X700X60-49N-D")
+        (spec "System")
+    )
+)

@@ -1,0 +1,15 @@
+{
+  "checked_nets": 29,
+  "checked_connected_pins": 107,
+  "driver_pins": 49,
+  "nc_pins": [
+    9,
+    12,
+    25,
+    28,
+    36,
+    37,
+    38
+  ],
+  "failures": []
+}

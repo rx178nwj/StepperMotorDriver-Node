@@ -1,0 +1,37 @@
+# Firmware build output
+firmware/build/
+
+# Old backups / archives
+buckup/
+archive/
+
+# Datasheets (not tracked, see datasheet/README.md)
+datasheet/*
+!datasheet/README.md
+
+# KiCad / MCP backups and outputs
+schematic_*/.mcp-backups/
+**/*-backups/
+**/backup_before_*/
+schematic_*/out/
+
+# KiCad personal settings / locks / temp
+*.kicad_prl
+fp-info-cache
+*.lck
+~*
+_autosave-*
+*.bak
+
+# Machine-dependent config
+.mcp.json
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OneDrive / OS
+desktop.ini
+Thumbs.db

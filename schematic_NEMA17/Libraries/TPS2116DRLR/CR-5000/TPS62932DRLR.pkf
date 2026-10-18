@@ -1,0 +1,10 @@
+(unit MM)
+
+(package "TPS62932DRLR"
+    (type UNDEF)
+    (uver 2)
+    (mountForm default
+        (footprintRef "TPS62932DRLR")
+        (spec "default")
+    )
+)

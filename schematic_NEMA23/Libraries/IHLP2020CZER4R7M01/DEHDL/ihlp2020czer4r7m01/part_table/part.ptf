@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'IHLP2020CZER4R7M01'
+CLASS = DISCRETE
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "Vishay", "IHLP2020CZER4R7M01" (!) = "", "INDPM5552X300N", "Inductors Precision Moulded", "70-IHLP2020CZER4R7M0", "https://www.mouser.co.uk/ProductDetail/Vishay-Dale/IHLP2020CZER4R7M01?qs=GxOUx7aO6nycfkr%252BvLVVZQ%3D%3D", "Vishay IHLP2020CZ-01 Series Shielded Wire-wound SMD Inductor 4.7 uH +/-20% 8.2A Idc", "https://www.vishay.com/docs/34563/ihlp-2020cz-8a.pdf", "3 mm"
+END_PART
+
+END.

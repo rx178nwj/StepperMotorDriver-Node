@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP DFE322520FD-4R7M=P2
+D DFE322520F_D Series Inductor 4.7uH +/-20% 1210 (3225)
+K
+F https://search.murata.co.jp/Ceramy/image/img/P02/J(E)TE243A-9104.pdf
+$ENDCMP
+#
+#End Doc Library

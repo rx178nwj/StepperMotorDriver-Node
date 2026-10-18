@@ -1,0 +1,65 @@
+(Japanese_coding: sjis)
+(function "ECS_13235599"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2021-06-24-12:28:39)
+    (utime 2023-03-07-16:10:32)
+    (interface
+        (port "1" (symbPinId 1) (portType INOUT))
+        (port "2" (symbPinId 2) (portType INOUT))
+    )
+    (property "symbolName" "SPM5030VT-4R7M-D")
+)
+
+
+(pinAssign "ECS_13235599"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2021-06-24-12:28:39)
+    (utime 2023-03-07-16:10:32)
+    (interface
+        (port "1" (symbPinId 1) (portName "1") (portType INOUT))
+        (port "2" (symbPinId 2) (portName "2") (portType INOUT))
+    )
+    (internal
+        (funcInst (functionRef "ECS_13235599")
+                (port "1" (match "1"))
+                (port "2" (match "2"))
+        )
+    )
+    (property "usePowerBox" "No")
+    (property "symbolName" "SPM5030VT-4R7M-D")
+)
+
+
+(part "SPM5030VT-4R7M-D"
+    (uver 1)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (ctime 2021-06-24-12:28:39)
+    (utime 2023-03-07-16:10:32)
+    (packageRef "SPM5030VT-4R7M-D")
+    (pinAssignRef "ECS_13235599")
+    (interface
+        (port "1" (symbPinId 1) (portName "1") (portType INOUT))
+        (port "2" (symbPinId 2) (portName "2") (portType INOUT))
+    )
+    (partClass UNDEF)
+    (useInSchema Y)
+    (useInLayout Y)
+    (inPartsList Y)
+    (partType NORMAL)
+    (placeRestriction FREE)
+    (property "enetNonSeries" "YES")
+    (property "refDesPrefix" "L")
+    (property "description" "Inductors for power circuits, Wound metal, Automotive")
+    (property "Mouser_Part_Number" "810-SPM5030VT-4R7M-D")
+    (property "Mouser_Price/Stock" "https://www.mouser.co.uk/ProductDetail/TDK/SPM5030VT-4R7M-D?qs=yqaQSyyJnNiJxBMQBa5s3Q%3D%3D")
+    (property "Manufacturer_Name" "TDK")
+    (property "Manufacturer_Part_Number" "SPM5030VT-4R7M-D")
+    (property "Datasheet_Link" "https://product.tdk.com/system/files/dam/doc/product/inductor/inductor/smd/catalog/inductor_automotive_power_spm5030vt-d_en.pdf")
+)
+
+

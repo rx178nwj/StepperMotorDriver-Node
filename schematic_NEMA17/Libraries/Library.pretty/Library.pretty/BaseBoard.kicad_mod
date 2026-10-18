@@ -1,0 +1,259 @@
+(footprint "BaseBoard"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -43.9 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "fbc2daaa-0b32-44b2-85e7-6426f3808883")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "BaseBoard"
+		(at 0 -42.4 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "468c0c49-fa01-4a75-af31-d7ec9ca7151f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ec92f354-27d2-464f-8731-27dae9b3ea0c")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ebbf3521-4e0d-49f3-b06c-bf2f49adc4cc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_circle
+		(center -15.5 -15.5)
+		(end -13.9 -15.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "168aa6e4-470b-405f-9b4f-ef006480e984")
+	)
+	(fp_circle
+		(center -15.5 15.5)
+		(end -13.9 15.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "e9be0b2c-a798-4d91-ab6b-76bc57ab8cd7")
+	)
+	(fp_circle
+		(center 15.5 -15.5)
+		(end 17.1 -15.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "8296f211-4e12-45ac-bc03-7eb706cfac9b")
+	)
+	(fp_circle
+		(center 15.5 15.5)
+		(end 17.1 15.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "533bccdc-539b-4018-b9c9-c1cfb7b34d40")
+	)
+	(fp_poly
+		(pts
+			(xy -16 -21) (xy 16 -21) (xy 21 -16) (xy 21 16) (xy 16 21) (xy -16 21) (xy -21 16) (xy -21 -16)
+		)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "012380c7-9984-44f3-b389-4cfc6dccaed3")
+	)
+	(fp_circle
+		(center -15.5 -15.5)
+		(end -12.3 -15.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Margin")
+		(uuid "d1f15a7d-9e3c-44ea-b39b-75682bf9ff80")
+	)
+	(fp_circle
+		(center -15.5 15.5)
+		(end -12.3 15.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Margin")
+		(uuid "4b61a2b0-cbb2-4dae-b969-e71f4ac230c7")
+	)
+	(fp_circle
+		(center 15.5 -15.5)
+		(end 18.7 -15.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Margin")
+		(uuid "90c57dd4-0403-4a12-a8a2-41b0197785fd")
+	)
+	(fp_circle
+		(center 15.5 15.5)
+		(end 18.7 15.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Margin")
+		(uuid "017a607f-3fc6-479e-ab44-a06dd664e4ef")
+	)
+	(fp_circle
+		(center -15.5 -15.5)
+		(end -18.5 -15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "B.CrtYd")
+		(uuid "2bcf403e-8125-46f9-8105-e2624540383f")
+	)
+	(fp_circle
+		(center -15.5 15.5)
+		(end -18.5 15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "B.CrtYd")
+		(uuid "61a12e65-231e-44b0-9ebb-fef74b581f77")
+	)
+	(fp_circle
+		(center 15.5 -15.5)
+		(end 18.501666 -15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "B.CrtYd")
+		(uuid "15d3f1d2-61eb-43a5-a787-1e620e1f51a6")
+	)
+	(fp_circle
+		(center 15.5 15.5)
+		(end 18.5 15.6)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "B.CrtYd")
+		(uuid "3bc3b229-824c-496e-b492-ca313e1c6372")
+	)
+	(fp_circle
+		(center -15.5 -15.5)
+		(end -12.5 -15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "199696a4-ec7c-42c3-81f1-bbc68e0d7649")
+	)
+	(fp_circle
+		(center -15.5 15.5)
+		(end -12.5 15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "a80c6a91-411f-465c-a471-65605facfd3e")
+	)
+	(fp_circle
+		(center 15.5 -15.5)
+		(end 18.5 -15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "5bcb2129-4597-420d-857e-0a2b548e4f6e")
+	)
+	(fp_circle
+		(center 15.5 15.5)
+		(end 18.5 15.5)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "2b3e344e-3a27-412d-b475-631aa8f8c02a")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 -40.9 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "15cb972d-56fc-47bf-b08b-86a4a7d023d5")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(embedded_fonts no)
+)

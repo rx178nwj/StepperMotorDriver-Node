@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP SPM5030VT-4R7M-D
+D Inductors for power circuits, Wound metal, Automotive
+K
+F https://product.tdk.com/system/files/dam/doc/product/inductor/inductor/smd/catalog/inductor_automotive_power_spm5030vt-d_en.pdf
+$ENDCMP
+#
+#End Doc Library

@@ -1,0 +1,9 @@
+Manufacturer=STMicroelectronics
+PartNumber=STM32L433CCU6
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=49
+Version=2.2
+Released=2018-06-04 08:30:44
+Downloaded=2026-09-27 15:00:18
+3D=Y

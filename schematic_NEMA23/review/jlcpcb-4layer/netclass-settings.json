@@ -1,0 +1,559 @@
+﻿{
+  "project": "H:\\OneDrive\\CraftWork\\SteppingMotorDriver_NEMA23\\schematic\\schematic.kicad_pro",
+  "net_settings": {
+    "classes": [
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Default",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.15,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "ANALOG",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "DIGITAL",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 6,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.15,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "MOTOR_PHASE",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 6,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 2.0,
+        "tuning_profile": "",
+        "via_diameter": 1.0,
+        "via_drill": 0.5,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.15,
+        "diff_pair_via_gap": 0.15,
+        "diff_pair_width": 0.15,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "PCA9615_DIFF",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 3,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.15,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "POWER_1A",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 4,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.15,
+        "diff_pair_via_gap": 0.15,
+        "diff_pair_width": 0.25,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "USB",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "VM_POWER",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 5,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 1.0,
+        "via_drill": 0.5,
+        "wire_width": 6
+      }
+    ],
+    "meta": {
+      "version": 5
+    },
+    "net_colors": null,
+    "netclass_assignments": {
+      "/TEMP": [
+        "ANALOG"
+      ],
+      "/AD_IN": [
+        "ANALOG"
+      ],
+      "/DAC_VREF": [
+        "ANALOG"
+      ],
+      "/DRV_VREF": [
+        "ANALOG"
+      ],
+      "/VM_DIV": [
+        "ANALOG"
+      ],
+      "/VM_SENSE_ISO": [
+        "ANALOG"
+      ],
+      "/VM_SENSE": [
+        "ANALOG"
+      ],
+      "/USB_PC_DP": [
+        "USB"
+      ],
+      "/USB_PC_DM": [
+        "USB"
+      ],
+      "/DI2C_SDA_P": [
+        "PCA9615_DIFF"
+      ],
+      "/DI2C_SDA_M": [
+        "PCA9615_DIFF"
+      ],
+      "/DI2C_SCL_P": [
+        "PCA9615_DIFF"
+      ],
+      "/DI2C_SCL_M": [
+        "PCA9615_DIFF"
+      ],
+      "+3V3": [
+        "POWER_1A"
+      ],
+      "/+5V": [
+        "POWER_1A"
+      ],
+      "/+5V_EXT": [
+        "POWER_1A"
+      ],
+      "/USB_VBUS": [
+        "POWER_1A"
+      ],
+      "/USB_VBUS_SRC": [
+        "POWER_1A"
+      ],
+      "/BUCK_SW": [
+        "POWER_1A"
+      ],
+      "/VDDA": [
+        "POWER_1A"
+      ],
+      "/DRV_VCC": [
+        "POWER_1A"
+      ],
+      "GND": [
+        "POWER_1A"
+      ],
+      "GNDA": [
+        "POWER_1A"
+      ],
+      "/VM": [
+        "VM_POWER"
+      ],
+      "GNDPWR": [
+        "VM_POWER"
+      ],
+      "/OUTA_P": [
+        "MOTOR_PHASE"
+      ],
+      "/OUTA_N": [
+        "MOTOR_PHASE"
+      ],
+      "/OUTB_P": [
+        "MOTOR_PHASE"
+      ],
+      "/OUTB_N": [
+        "MOTOR_PHASE"
+      ]
+    },
+    "netclass_patterns": [
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/ADDR0"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/ADDR1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/ADDR2"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_AGC0"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_AGC1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_CLK"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_DIR"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_DMODE0"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_DMODE1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_DMODE2"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_EN"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_LO1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_LO2"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_MO"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/DRV_RESET"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/ENC_A_HOME1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/ENC_B_HOME2"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/I2C_PC_SCL"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/I2C_PC_SDA"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/I2C_SENS_SCL"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/I2C_SENS_SDA"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/LED_COMM"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/LED_FAULT"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/LED_MCU"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/LED_RUN"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/NRST"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/PB8_BOOT"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/PWR_ST"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/SWCLK"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/SWDIO"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/SWITCH1"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/SWITCH2"
+      },
+      {
+        "netclass": "DIGITAL",
+        "pattern": "/SWO"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/TEMP"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/AD_IN"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/DAC_VREF"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/DRV_VREF"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/VM_DIV"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/VM_SENSE_ISO"
+      },
+      {
+        "netclass": "ANALOG",
+        "pattern": "/VM_SENSE"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "/USB_PC_DP"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "/USB_PC_DM"
+      },
+      {
+        "netclass": "PCA9615_DIFF",
+        "pattern": "/DI2C_SDA_P"
+      },
+      {
+        "netclass": "PCA9615_DIFF",
+        "pattern": "/DI2C_SDA_M"
+      },
+      {
+        "netclass": "PCA9615_DIFF",
+        "pattern": "/DI2C_SCL_P"
+      },
+      {
+        "netclass": "PCA9615_DIFF",
+        "pattern": "/DI2C_SCL_M"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "+3V3"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/+5V"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/+5V_EXT"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/USB_VBUS"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/USB_VBUS_SRC"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/BUCK_SW"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/VDDA"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "/DRV_VCC"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "GND"
+      },
+      {
+        "netclass": "POWER_1A",
+        "pattern": "GNDA"
+      },
+      {
+        "netclass": "VM_POWER",
+        "pattern": "/VM"
+      },
+      {
+        "netclass": "VM_POWER",
+        "pattern": "GNDPWR"
+      },
+      {
+        "netclass": "MOTOR_PHASE",
+        "pattern": "/OUTA_P"
+      },
+      {
+        "netclass": "MOTOR_PHASE",
+        "pattern": "/OUTA_N"
+      },
+      {
+        "netclass": "MOTOR_PHASE",
+        "pattern": "/OUTB_P"
+      },
+      {
+        "netclass": "MOTOR_PHASE",
+        "pattern": "/OUTB_N"
+      }
+    ]
+  },
+  "routing_presets": {
+    "track_widths": [
+      0.0,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.4,
+      0.5,
+      0.8,
+      1.0,
+      2.0
+    ],
+    "via_dimensions": [
+      {
+        "diameter": 0.0,
+        "drill": 0.0
+      },
+      {
+        "diameter": 0.6,
+        "drill": 0.3
+      },
+      {
+        "diameter": 0.7,
+        "drill": 0.4
+      },
+      {
+        "diameter": 0.8,
+        "drill": 0.5
+      },
+      {
+        "diameter": 0.8,
+        "drill": 0.4
+      },
+      {
+        "diameter": 1.0,
+        "drill": 0.5
+      }
+    ],
+    "diff_pair_dimensions": [
+      {
+        "gap": 0.0,
+        "via_gap": 0.0,
+        "width": 0.0
+      },
+      {
+        "gap": 0.15,
+        "via_gap": 0.15,
+        "width": 0.15
+      },
+      {
+        "gap": 0.15,
+        "via_gap": 0.15,
+        "width": 0.25
+      }
+    ]
+  }
+}

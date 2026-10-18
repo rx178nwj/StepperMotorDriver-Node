@@ -1,0 +1,181 @@
+(footprint "INDPM5552X300N"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "IHLP-2020CZ-5A")
+	(tags "Inductor")
+	(property "Reference" "L**"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(uuid "e01916c8-abda-469e-bb5c-ef70101e6c43")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.254)
+			)
+		)
+	)
+	(property "Value" "INDPM5552X300N"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "1b2b8212-e795-45e4-b5c2-9f1bbb746cc0")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.254)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "b56b6ce2-7659-40cd-a0f1-0a305418cfd8")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "c788258c-c784-4b3b-a39d-c4bf4521c868")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -2.745 2.59)
+		(end 2.745 2.59)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "e5667ada-5a66-4d55-bd6a-49ed7f3005d9")
+	)
+	(fp_line
+		(start 2.745 -2.59)
+		(end -2.745 -2.59)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a924e8e7-b80f-47f6-b4de-051f1165e1b7")
+	)
+	(fp_line
+		(start -3.625 -2.967)
+		(end 3.625 -2.967)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "fe912b79-2ad4-494e-b5b0-984c41394b60")
+	)
+	(fp_line
+		(start -3.625 2.967)
+		(end -3.625 -2.967)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "60dc4cc4-79cc-438a-b6a5-e6590b73abba")
+	)
+	(fp_line
+		(start -2.745 -2.59)
+		(end 2.745 -2.59)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "435a1aa1-33c8-4e93-b10b-80cce6ec2d3e")
+	)
+	(fp_line
+		(start -2.745 2.59)
+		(end -2.745 -2.59)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "db7d670b-ff8e-4d7d-bb62-6c7823f743ef")
+	)
+	(fp_line
+		(start 2.745 -2.59)
+		(end 2.745 2.59)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "3af52831-88d5-45b2-8c39-b4eb2b716a87")
+	)
+	(fp_line
+		(start 2.745 2.59)
+		(end -2.745 2.59)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "f7713702-795a-4860-9a73-5556c883a4eb")
+	)
+	(fp_line
+		(start 3.625 -2.967)
+		(end 3.625 2.967)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "a1afd310-5566-4625-a5aa-510803c3dcf9")
+	)
+	(fp_line
+		(start 3.625 2.967)
+		(end -3.625 2.967)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "04b459fa-7db1-4894-8575-8a88911f3cc5")
+	)
+	(pad "1" smd rect
+		(at -2.35 0)
+		(size 2.05 2.7)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(thermal_bridge_angle 45)
+		(uuid "5127cf36-fb49-4e1c-b1dc-56444516fc88")
+	)
+	(pad "2" smd rect
+		(at 2.35 0)
+		(size 2.05 2.7)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(thermal_bridge_angle 45)
+		(uuid "c4d3dbb7-584a-4df6-8fa0-abc61ef40f20")
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/Libraries/IHLP2020CZER4R7M01/3D/IHLP2020CZER4R7M01.stp"
+		(offset
+			(xyz -0.75 6 -2.45)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -90 -0 -0)
+		)
+	)
+)

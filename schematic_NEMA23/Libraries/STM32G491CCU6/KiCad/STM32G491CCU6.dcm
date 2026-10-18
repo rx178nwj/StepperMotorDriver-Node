@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP STM32G491CCU6
+D Arm Cortex-M4 32-bit MCU+FPU, 170 MHz / 213 DMIPS, up to 512 KB Flash, 112 KB SRAM, rich analog, math accelerator
+K
+F https://www.st.com/resource/en/datasheet/stm32g491cc.pdf
+$ENDCMP
+#
+#End Doc Library

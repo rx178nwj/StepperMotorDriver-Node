@@ -1,0 +1,16 @@
+.NCP360SNT1G :1 ;These are Pb-Free Devices; Very Fast Protection, Up to 20 V, with 25 A Current Consumption; On-chip PMOS Transistor; Overvoltage Lockout (OVLO); Undervoltage Lockout (UVLO); Alert FLAG Output; EN Enable Pin; Thermal Shutdown; 6-Lead UDFN 2 x 2 mm Package; TSOP-5 3 x 3 mm Package; Personal Digital Applications; MP3 Players; Computing
+SOT95P275X110-5N
+*STM IC
+*NGS
+*PLB 1="IN" 2="GND" 3="'EN'" 4="'FLAG'" 5="OUT"
+*MXP 5
+*DFN NCP360SNT1G
+~!Mouser Part Number (863-NCP360SNT1G)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/onsemi/NCP360SNT1G?qs=VZGfJwuufXYrtJO9gU8MlQ%3D%3D)
+~!Manufacturer_Name (onsemi)
+~!Manufacturer_Part_Number (NCP360SNT1G)
+~!Link Datasheet (https://www.onsemi.com/pub/Collateral/NCP360-D.PDF)
+~!Height (1.1mm)
+~!3D_Model (NCP360SNT1G)
+NCP360SNT1G
+1.1!I 2.1!G 3.1!U 4.1!U 5.1!Y 

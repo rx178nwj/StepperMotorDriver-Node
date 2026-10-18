@@ -1,0 +1,9 @@
+Manufacturer=STMicroelectronics
+PartNumber=STM32G473CBU6
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=49
+Version=2.1
+Released=2020-12-05 07:54:21
+Downloaded=2026-09-27 14:38:09
+3D=Y

@@ -1,0 +1,9 @@
+Manufacturer=NXP
+PartNumber=TJA1441AT/0Z
+PartCategory=Integrated Circuit
+PackageCategory=Small Outline Packages
+PinCount=8
+Version=1.1
+Released=2021-07-13 11:06:35
+Downloaded=2026-10-17 03:06:17
+3D=Y

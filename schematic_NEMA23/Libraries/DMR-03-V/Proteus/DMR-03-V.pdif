@@ -1,0 +1,99 @@
+;Proteus Design Interchange Format
+(PDIF
+ (vendor "SamacSys Limited")
+ (version 1 0)
+ (library
+  (part "DMR-03-V"
+   (description "DIP Switches  3 Position 3PST SMD/SMT 24 VDC 25 mA")
+   (family "SWI")
+   (package "DMR03V")
+   (attribute "Datasheet Link" "")
+   (attribute "Geometry.Height" "4.4mm")
+   (attribute "Mouser Part Number" "113-DMR03V")
+   (attribute "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Diptronics/DMR-03-V?qs=MLItCLRbWszPD8Gf56uzfQ%3D%3D")
+   (attribute "Manufacturer_Name" "Diptronics")
+   (attribute "Manufacturer_Part_Number" "DMR-03-V")
+   (gate
+    (symbol "DMR-03-V")
+   )
+  )
+  (symbol "DMR-03-V"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 200 100) (pt 500 100) (pt 500 0) (pt 200 0) (pt 200 100) (closed))
+   )
+  )
+  (symbol "PIN"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 200 0))))
+  (symbol "PINSHORT"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 100 0))))
+  (package "DMR03V"
+   (units MM)
+   (layer TASM
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -4.28 -3.1)
+      (pt 4.28 -3.1)
+      (pt 4.28 3.1)
+      (pt -4.28 3.1)
+      (pt -4.28 -3.1))))
+   (layer TSLK
+    (graphic
+     (stroke 0.2)
+     (path
+      (closed true)
+      (pt -4.28 3.1)
+      (pt 4.28 3.1)
+      (pt 4.28 -3.1)
+      (pt -4.28 -3.1)
+      (pt -4.28 3.1))))
+   (layer OCCA
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -5.28 6.2)
+      (pt 5.28 6.2)
+      (pt 5.28 -6.2)
+      (pt -5.28 -6.2)
+      (pt -5.28 6.2))))
+   (layer TSLK
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed false)
+      (pt -2.54 -5.9)
+      (arc (pt -2.540 -5.900) (pt -2.590 -5.900) (pt -2.490 -5.800) (start 180.0) (sweep -90.0))
+      (pt -2.54 -5.8)
+      (arc (pt -2.540 -5.800) (pt -2.590 -5.900) (pt -2.490 -5.800) (start 180.0) (sweep 90.0))
+      (pt -2.54 -5.9)
+      (pt -2.54 -5.8))))
+   (leg 1 (pt -2.540 -4.450) (padstack 0))
+   (leg 2 (pt 0.000 -4.450) (padstack 0))
+   (leg 3 (pt 2.540 -4.450) (padstack 0))
+   (leg 4 (pt 2.540 4.450) (padstack 0))
+   (leg 5 (pt 0.000 4.450) (padstack 0))
+   (leg 6 (pt -2.540 4.450) (padstack 0))
+   (padstack 0
+    (plated false)
+    (pad (layer TCOP) (rectf 1.100 1.500 0 0 90.000))
+   )
+   (model "DMR-03-V.stp"
+    (euler 0 0 0)
+    (offset 3.799999952316284 0 1.4500000476837158)
+   )
+  )
+ )
+)

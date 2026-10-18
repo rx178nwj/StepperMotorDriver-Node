@@ -1,0 +1,13 @@
+(unit MM)
+
+(package "IHLP2020CZER4R7M01"
+    (type UNDEF)
+    (uver 2)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (utime 2019-02-24-20:47:07)
+    (mountForm default
+        (footprintRef "INDPM5552X300N")
+        (spec "System")
+    )
+)

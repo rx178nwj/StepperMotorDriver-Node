@@ -1,0 +1,53 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-10-04T15:08:40",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "10.0.4",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/9fdd081c-730e-4fc3-b866-b3cdf49e5309",
+            "violations": [
+                {
+                    "description": "現在の構成にはシンボル ライブラリ 'USB Protection' が含まれていません",
+                    "items": [
+                        {
+                            "description": "シンボル U20 [NCP360]",
+                            "pos": {
+                                "x": 6.3119,
+                                "y": 1.0414
+                            },
+                            "uuid": "518f27e0-eba5-4b14-9a18-d8ddb3734d4c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_issues"
+                }
+            ]
+        }
+    ],
+    "source": "schematic.kicad_sch"
+}

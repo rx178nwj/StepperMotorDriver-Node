@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'TJA1441AT_0Z'
+CLASS = IC
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "NXP", "TJA1441AT/0Z" (!) = "", "SOIC127P600X175-8N", "Small Outline Packages", "771-TJA1441AT/0Z", "https://www.mouser.co.uk/ProductDetail/NXP-Semiconductors/TJA1441AT-0Z?qs=eP2BKZSCXI7fcqmlBnmIFw%3D%3D", "High-speed CAN transceiver", "https://www.mouser.it/datasheet/2/302/TJA1441-1949304.pdf", "1.75 mm"
+END_PART
+
+END.

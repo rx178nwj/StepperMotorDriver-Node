@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP NCP360SNT1G
+D These are Pb-Free Devices; Very Fast Protection, Up to 20 V, with 25 A Current Consumption; On-chip PMOS Transistor; Overvoltage Lockout (OVLO); Undervoltage Lockout (UVLO); Alert FLAG Output; EN Enable Pin; Thermal Shutdown; 6-Lead UDFN 2 x 2 mm Package; TSOP-5 3 x 3 mm Package; Personal Digital Applications; MP3 Players; Computing
+K
+F https://www.onsemi.com/pub/Collateral/NCP360-D.PDF
+$ENDCMP
+#
+#End Doc Library

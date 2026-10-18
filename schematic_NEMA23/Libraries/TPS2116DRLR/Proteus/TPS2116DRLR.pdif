@@ -1,0 +1,130 @@
+;Proteus Design Interchange Format
+(PDIF
+ (vendor "SamacSys Limited")
+ (version 1 0)
+ (library
+  (part "TPS2116DRLR"
+   (description "d")
+   (family "ANA")
+   (package "TPS62932DRLR")
+   (attribute "Datasheet Link" "https://www.ti.com/lit/gpn/tps2116")
+   (attribute "Geometry.Height" "0.6mm")
+   (attribute "Mouser Part Number" "595-TPS2116DRLR")
+   (attribute "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/TPS2116DRLR?qs=aP1CjGhiNiGo3XAyXcVPaQ%3D%3D")
+   (attribute "Manufacturer_Name" "Texas Instruments")
+   (attribute "Manufacturer_Part_Number" "TPS2116DRLR")
+   (gate
+    (symbol "TPS2116DRLR")
+    (pin "GND" 1 PS)
+    (pin "VOUT_1" 2 PS)
+    (pin "VIN1" 3 PS)
+    (pin "PR1" 4 PS)
+    (pin "MODE" 5 PS)
+    (pin "VIN2" 6 PS)
+    (pin "VOUT_2" 7 PS)
+    (pin "ST" 8 PS)
+   )
+  )
+  (symbol "TPS2116DRLR"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 200 100) (pt 1100 100) (pt 1100 -400) (pt 200 -400) (pt 200 100) (closed))
+   )
+   (terminal
+    (body (symbol "PIN") (pt 0 0) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 0 -100) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 0 -200) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 0 -300) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 1300 -300) (rot 0) (mir X) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 1300 -200) (rot 0) (mir X) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 1300 -100) (rot 0) (mir X) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 1300 0) (rot 0) (mir X) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+  )
+  (symbol "PIN"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 200 0))))
+  (symbol "PINSHORT"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 100 0))))
+  (package "TPS62932DRLR"
+   (units MM)
+   (layer TASM
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -0.6 1.05)
+      (pt 0.6 1.05)
+      (pt 0.6 -1.05)
+      (pt -0.6 -1.05)
+      (pt -0.6 1.05))))
+   (layer OCCA
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -2.075 2.05)
+      (pt 2.075 2.05)
+      (pt 2.075 -2.05)
+      (pt -2.075 -2.05)
+      (pt -2.075 2.05))))
+   (layer TSLK
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -1.6 0.6)
+      (arc (pt -1.600 0.600) (pt -1.650 0.600) (pt -1.550 0.700) (start 180.0) (sweep -90.0))
+      (pt -1.6 0.7)
+      (arc (pt -1.600 0.700) (pt -1.650 0.600) (pt -1.550 0.700) (start 180.0) (sweep 90.0))
+      (pt -1.6 0.6))))
+   (leg 1 (pt -0.740 0.750) (padstack 0))
+   (leg 2 (pt -0.740 0.250) (padstack 0))
+   (leg 3 (pt -0.740 -0.250) (padstack 0))
+   (leg 4 (pt -0.740 -0.750) (padstack 0))
+   (leg 5 (pt 0.740 -0.750) (padstack 0))
+   (leg 6 (pt 0.740 -0.250) (padstack 0))
+   (leg 7 (pt 0.740 0.250) (padstack 0))
+   (leg 8 (pt 0.740 0.750) (padstack 0))
+   (padstack 0
+    (plated false)
+    (pad (layer TCOP) (rectf 0.300 0.670 0 0 0.000))
+   )
+   (model "TPS2116DRLR.stp"
+    (euler 0 0 0)
+    (offset 0 0 0)
+   )
+  )
+ )
+)

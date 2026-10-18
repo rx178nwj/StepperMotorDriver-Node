@@ -1,0 +1,331 @@
+﻿{
+  "kicad_version": "10.0.4",
+  "applied": {
+    "native_project_loader": true
+  },
+  "classes": [
+    {
+      "name": "Default",
+      "track_width": 0.15,
+      "clearance": 0.15,
+      "via_diameter": 0.6,
+      "via_drill": 0.3,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    },
+    {
+      "name": "ANALOG",
+      "track_width": 0.2,
+      "clearance": 0.15,
+      "via_diameter": 0.6,
+      "via_drill": 0.3,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    },
+    {
+      "name": "DIGITAL",
+      "track_width": 0.15,
+      "clearance": 0.15,
+      "via_diameter": 0.6,
+      "via_drill": 0.3,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    },
+    {
+      "name": "MOTOR_PHASE",
+      "track_width": 2.0,
+      "clearance": 0.15,
+      "via_diameter": 1.0,
+      "via_drill": 0.5,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    },
+    {
+      "name": "PCA9615_DIFF",
+      "track_width": 0.15,
+      "clearance": 0.15,
+      "via_diameter": 0.6,
+      "via_drill": 0.3,
+      "diff_pair_width": 0.15,
+      "diff_pair_gap": 0.15
+    },
+    {
+      "name": "POWER_1A",
+      "track_width": 0.5,
+      "clearance": 0.15,
+      "via_diameter": 0.8,
+      "via_drill": 0.4,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    },
+    {
+      "name": "USB",
+      "track_width": 0.25,
+      "clearance": 0.15,
+      "via_diameter": 0.6,
+      "via_drill": 0.3,
+      "diff_pair_width": 0.25,
+      "diff_pair_gap": 0.15
+    },
+    {
+      "name": "VM_POWER",
+      "track_width": 0.5,
+      "clearance": 0.15,
+      "via_diameter": 1.0,
+      "via_drill": 0.5,
+      "diff_pair_width": 0.2,
+      "diff_pair_gap": 0.25
+    }
+  ],
+  "nets": [
+    {
+      "net": "/TEMP",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/AD_IN",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/DAC_VREF",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/DRV_VREF",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/VM_DIV",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/VM_SENSE_ISO",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/VM_SENSE",
+      "class": "ANALOG"
+    },
+    {
+      "net": "/USB_PC_DP",
+      "class": "USB"
+    },
+    {
+      "net": "/USB_PC_DM",
+      "class": "USB"
+    },
+    {
+      "net": "/DI2C_SDA_P",
+      "class": "PCA9615_DIFF"
+    },
+    {
+      "net": "/DI2C_SDA_M",
+      "class": "PCA9615_DIFF"
+    },
+    {
+      "net": "/DI2C_SCL_P",
+      "class": "PCA9615_DIFF"
+    },
+    {
+      "net": "/DI2C_SCL_M",
+      "class": "PCA9615_DIFF"
+    },
+    {
+      "net": "+3V3",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/+5V",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/+5V_EXT",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/USB_VBUS",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/USB_VBUS_SRC",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/BUCK_SW",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/VDDA",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/DRV_VCC",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "GND",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "GNDA",
+      "class": "POWER_1A"
+    },
+    {
+      "net": "/VM",
+      "class": "VM_POWER"
+    },
+    {
+      "net": "GNDPWR",
+      "class": "VM_POWER"
+    },
+    {
+      "net": "/OUTA_P",
+      "class": "MOTOR_PHASE"
+    },
+    {
+      "net": "/OUTA_N",
+      "class": "MOTOR_PHASE"
+    },
+    {
+      "net": "/OUTB_P",
+      "class": "MOTOR_PHASE"
+    },
+    {
+      "net": "/OUTB_N",
+      "class": "MOTOR_PHASE"
+    },
+    {
+      "net": "/ADDR0",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/ADDR1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/ADDR2",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_AGC0",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_AGC1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_CLK",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_DIR",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_DMODE0",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_DMODE1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_DMODE2",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_EN",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_LO1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_LO2",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_MO",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/DRV_RESET",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/ENC_A_HOME1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/ENC_B_HOME2",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/I2C_PC_SCL",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/I2C_PC_SDA",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/I2C_SENS_SCL",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/I2C_SENS_SDA",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/LED_COMM",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/LED_FAULT",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/LED_MCU",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/LED_RUN",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/NRST",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/PB8_BOOT",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/PWR_ST",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/SWCLK",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/SWDIO",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/SWITCH1",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/SWITCH2",
+      "class": "DIGITAL"
+    },
+    {
+      "net": "/SWO",
+      "class": "DIGITAL"
+    }
+  ],
+  "failures": []
+}

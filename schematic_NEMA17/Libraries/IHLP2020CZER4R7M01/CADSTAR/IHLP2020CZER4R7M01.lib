@@ -1,0 +1,16 @@
+.IHLP2020CZER4R7M01 :1 ;Vishay IHLP2020CZ-01 Series Shielded Wire-wound SMD Inductor 4.7 uH +/-20% 8.2A Idc
+INDPM5552X300N
+*STM L
+*NGS
+*PLB 1="1" 2="2"
+*MXP 2
+*DFN IHLP2020CZER4R7M01
+~!Mouser Part Number (70-IHLP2020CZER4R7M0)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/Vishay-Dale/IHLP2020CZER4R7M01?qs=GxOUx7aO6nycfkr%252BvLVVZQ%3D%3D)
+~!Manufacturer_Name (Vishay)
+~!Manufacturer_Part_Number (IHLP2020CZER4R7M01)
+~!Link Datasheet (https://www.vishay.com/docs/34563/ihlp-2020cz-8a.pdf)
+~!Height (3mm)
+~!3D_Model (IHLP2020CZER4R7M01)
+IHLP2020CZER4R7M01
+1.1!U 2.1!U 

@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP TJA1441AT_0Z
+D High-speed CAN transceiver
+K
+F https://www.mouser.it/datasheet/2/302/TJA1441-1949304.pdf
+$ENDCMP
+#
+#End Doc Library

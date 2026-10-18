@@ -1,0 +1,173 @@
+(footprint "ヒートシンク40x40"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -0.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "f833dacf-47f1-40b5-b997-33fe02cc6607")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "ヒートシンク40x40"
+		(at 0 1 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "9712e940-5dc7-4a79-b2d1-9dabddf55de2")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "c94b06ae-3044-4d7a-8111-27c371677330")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "bc5441ab-191d-4e21-b4d7-56e3d8a380e6")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -20 -20)
+		(end -17 -20)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "1a5925f6-2cfb-4b77-bdfd-04fd809749aa")
+	)
+	(fp_line
+		(start -20 -18)
+		(end -20 -20)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "21f00b3d-3cdf-4406-a079-b0fddfdc35ae")
+	)
+	(fp_line
+		(start -20 20)
+		(end -20 18)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "8c4edf85-a77b-4966-ae9e-85e47848e7cb")
+	)
+	(fp_line
+		(start -20 20)
+		(end -18 20)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "2cb0b0d9-36b6-40fe-b82c-00213a832a02")
+	)
+	(fp_line
+		(start 18 -20)
+		(end 20 -20)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "787578b3-2841-4bd4-ba31-bcc94f731ae9")
+	)
+	(fp_line
+		(start 18.5 20)
+		(end 20 20)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "dae59124-6509-43fd-a869-d4e228a14b2e")
+	)
+	(fp_line
+		(start 20 -20)
+		(end 20 -18)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "d00d6391-3b36-4209-b4ad-a957b0c3d110")
+	)
+	(fp_line
+		(start 20 20)
+		(end 20 18)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "b9b8787a-83fe-4589-bf91-92f747d9e392")
+	)
+	(fp_rect
+		(start -20 -20)
+		(end 20 20)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Eco1.User")
+		(uuid "39ec53d9-8017-495e-b8dc-5d12d4e4a351")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 2.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "44338a79-abcc-4130-bbcc-5c5cdf7bcadb")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/Libraries/ヒートシンク40x40.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

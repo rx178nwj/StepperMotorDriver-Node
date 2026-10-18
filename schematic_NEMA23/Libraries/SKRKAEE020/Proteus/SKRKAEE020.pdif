@@ -1,0 +1,98 @@
+;Proteus Design Interchange Format
+(PDIF
+ (vendor "SamacSys Limited")
+ (version 1 0)
+ (library
+  (part "SKRKAEE020"
+   (description "Tactile Switches 3.9x2.9x2.0mm 160gf Packaging Temp 80oC")
+   (family "SWI")
+   (package "SKRKAEE020")
+   (attribute "Datasheet Link" "http://www.alps.com/prod/info/J/HTML/Tact/SurfaceMount/SKRK/SKRKAEE020.html")
+   (attribute "Geometry.Height" "2mm")
+   (attribute "Mouser Part Number" "688-SKRKAEE020")
+   (attribute "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Alps-Alpine/SKRKAEE020?qs=MrosSN5%252BUQW89XjXIp8Ugw%3D%3D")
+   (attribute "Manufacturer_Name" "ALPS Electric")
+   (attribute "Manufacturer_Part_Number" "SKRKAEE020")
+   (gate
+    (symbol "SKRKAEE020")
+    (pin "1" 1 PS)
+    (pin "2" 2 PS)
+   )
+  )
+  (symbol "SKRKAEE020"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 200 100) (pt 600 100) (pt 600 -200) (pt 200 -200) (pt 200 100) (closed))
+   )
+   (terminal
+    (body (symbol "PIN") (pt 0 0) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+   (terminal
+    (body (symbol "PIN") (pt 0 -100) (rot 0) (mir 0) (visible true))
+    (name (pt 230 0) (rot 0) (just MIDDLE LEFT) (visible true))
+    (number (pt 140 20) (rot 0) (just BOTTOM RIGHT) (visible true)))
+  )
+  (symbol "PIN"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 200 0))))
+  (symbol "PINSHORT"
+   (units THOU)
+   (origin (pt 0 0))
+   (graphic
+    (stroke 10)
+    (path (pt 0 0) (pt 100 0))))
+  (package "SKRKAEE020"
+   (units MM)
+   (layer TASM
+    (graphic
+     (stroke 0.2)
+     (path
+      (closed true)
+      (pt -1.95 1.45)
+      (pt 1.95 1.45)
+      (pt 1.95 -1.45)
+      (pt -1.95 -1.45)
+      (pt -1.95 1.45))))
+   (layer OCCA
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed true)
+      (pt -3.5 2.45)
+      (pt 3.5 2.45)
+      (pt 3.5 -2.45)
+      (pt -3.5 -2.45)
+      (pt -3.5 2.45))))
+   (layer TSLK
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed false)
+      (pt -1.95 -1.45)
+      (pt 1.95 -1.45))))
+   (layer TSLK
+    (graphic
+     (stroke 0.1)
+     (path
+      (closed false)
+      (pt -1.95 1.45)
+      (pt 1.95 1.45))))
+   (leg 1 (pt -2.100 0.000) (padstack 0))
+   (leg 2 (pt 2.100 0.000) (padstack 0))
+   (padstack 0
+    (plated false)
+    (pad (layer TCOP) (rectf 0.800 2.000 0 0 90.000))
+   )
+   (model "SKRKAEE020.stp"
+    (euler 90 0 0)
+    (offset 0 0 0.75)
+   )
+  )
+ )
+)

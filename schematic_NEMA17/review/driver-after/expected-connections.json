@@ -1,0 +1,488 @@
+{
+  "DRV_CLK": [
+    {
+      "reference": "IC4",
+      "pin": "29"
+    },
+    {
+      "reference": "IC2",
+      "pin": "43"
+    }
+  ],
+  "DRV_DIR": [
+    {
+      "reference": "IC4",
+      "pin": "30"
+    },
+    {
+      "reference": "IC2",
+      "pin": "42"
+    }
+  ],
+  "DRV_EN": [
+    {
+      "reference": "IC4",
+      "pin": "31"
+    },
+    {
+      "reference": "IC2",
+      "pin": "44"
+    },
+    {
+      "reference": "R25",
+      "pin": "1"
+    }
+  ],
+  "DRV_RESET": [
+    {
+      "reference": "IC4",
+      "pin": "28"
+    },
+    {
+      "reference": "IC2",
+      "pin": "45"
+    }
+  ],
+  "DRV_DMODE0": [
+    {
+      "reference": "IC4",
+      "pin": "25"
+    },
+    {
+      "reference": "IC2",
+      "pin": "39"
+    }
+  ],
+  "DRV_DMODE1": [
+    {
+      "reference": "IC4",
+      "pin": "26"
+    },
+    {
+      "reference": "IC2",
+      "pin": "40"
+    }
+  ],
+  "DRV_DMODE2": [
+    {
+      "reference": "IC4",
+      "pin": "27"
+    },
+    {
+      "reference": "IC2",
+      "pin": "41"
+    }
+  ],
+  "DRV_AGC0": [
+    {
+      "reference": "IC4",
+      "pin": "45"
+    },
+    {
+      "reference": "IC2",
+      "pin": "1"
+    }
+  ],
+  "DRV_AGC1": [
+    {
+      "reference": "IC4",
+      "pin": "46"
+    },
+    {
+      "reference": "IC2",
+      "pin": "2"
+    }
+  ],
+  "DRV_LO1": [
+    {
+      "reference": "IC4",
+      "pin": "12"
+    },
+    {
+      "reference": "IC2",
+      "pin": "47"
+    },
+    {
+      "reference": "R26",
+      "pin": "2"
+    }
+  ],
+  "DRV_LO2": [
+    {
+      "reference": "IC4",
+      "pin": "13"
+    },
+    {
+      "reference": "IC2",
+      "pin": "48"
+    },
+    {
+      "reference": "R27",
+      "pin": "2"
+    }
+  ],
+  "DRV_MO": [
+    {
+      "reference": "IC4",
+      "pin": "4"
+    },
+    {
+      "reference": "IC2",
+      "pin": "46"
+    },
+    {
+      "reference": "R28",
+      "pin": "2"
+    }
+  ],
+  "+3V3_D": [
+    {
+      "reference": "R26",
+      "pin": "1"
+    },
+    {
+      "reference": "R27",
+      "pin": "1"
+    },
+    {
+      "reference": "R28",
+      "pin": "1"
+    }
+  ],
+  "DAC_VREF": [
+    {
+      "reference": "IC4",
+      "pin": "14"
+    },
+    {
+      "reference": "R29",
+      "pin": "2"
+    }
+  ],
+  "DRV_VREF": [
+    {
+      "reference": "R29",
+      "pin": "1"
+    },
+    {
+      "reference": "R30",
+      "pin": "1"
+    },
+    {
+      "reference": "C21",
+      "pin": "1"
+    },
+    {
+      "reference": "IC2",
+      "pin": "31"
+    },
+    {
+      "reference": "IC2",
+      "pin": "32"
+    }
+  ],
+  "DRV_OSCM": [
+    {
+      "reference": "IC2",
+      "pin": "35"
+    },
+    {
+      "reference": "R23",
+      "pin": "2"
+    },
+    {
+      "reference": "C20",
+      "pin": "1"
+    }
+  ],
+  "DRV_LTH": [
+    {
+      "reference": "IC2",
+      "pin": "7"
+    },
+    {
+      "reference": "R24",
+      "pin": "1"
+    }
+  ],
+  "DRV_VCC": [
+    {
+      "reference": "IC2",
+      "pin": "33"
+    },
+    {
+      "reference": "IC2",
+      "pin": "34"
+    },
+    {
+      "reference": "C19",
+      "pin": "1"
+    },
+    {
+      "reference": "R23",
+      "pin": "1"
+    },
+    {
+      "reference": "R50",
+      "pin": "1"
+    },
+    {
+      "reference": "R52",
+      "pin": "1"
+    },
+    {
+      "reference": "R54",
+      "pin": "1"
+    },
+    {
+      "reference": "R56",
+      "pin": "1"
+    }
+  ],
+  "DRV_CLIM0": [
+    {
+      "reference": "IC2",
+      "pin": "3"
+    },
+    {
+      "reference": "R50",
+      "pin": "2"
+    },
+    {
+      "reference": "R51",
+      "pin": "1"
+    }
+  ],
+  "GND": [
+    {
+      "reference": "R51",
+      "pin": "2"
+    },
+    {
+      "reference": "R53",
+      "pin": "2"
+    },
+    {
+      "reference": "R55",
+      "pin": "2"
+    },
+    {
+      "reference": "R57",
+      "pin": "2"
+    },
+    {
+      "reference": "IC2",
+      "pin": "8"
+    },
+    {
+      "reference": "IC2",
+      "pin": "29"
+    },
+    {
+      "reference": "IC2",
+      "pin": "30"
+    },
+    {
+      "reference": "IC2",
+      "pin": "49"
+    },
+    {
+      "reference": "R24",
+      "pin": "2"
+    },
+    {
+      "reference": "R25",
+      "pin": "2"
+    },
+    {
+      "reference": "R30",
+      "pin": "2"
+    },
+    {
+      "reference": "C19",
+      "pin": "2"
+    },
+    {
+      "reference": "C20",
+      "pin": "2"
+    },
+    {
+      "reference": "C21",
+      "pin": "2"
+    },
+    {
+      "reference": "NT1",
+      "pin": "2"
+    }
+  ],
+  "DRV_CLIM1": [
+    {
+      "reference": "IC2",
+      "pin": "4"
+    },
+    {
+      "reference": "R52",
+      "pin": "2"
+    },
+    {
+      "reference": "R53",
+      "pin": "1"
+    }
+  ],
+  "DRV_BOOST": [
+    {
+      "reference": "IC2",
+      "pin": "6"
+    },
+    {
+      "reference": "R54",
+      "pin": "2"
+    },
+    {
+      "reference": "R55",
+      "pin": "1"
+    }
+  ],
+  "DRV_FLIM": [
+    {
+      "reference": "IC2",
+      "pin": "5"
+    },
+    {
+      "reference": "R56",
+      "pin": "2"
+    },
+    {
+      "reference": "R57",
+      "pin": "1"
+    }
+  ],
+  "VM": [
+    {
+      "reference": "IC2",
+      "pin": "10"
+    },
+    {
+      "reference": "IC2",
+      "pin": "11"
+    },
+    {
+      "reference": "IC2",
+      "pin": "26"
+    },
+    {
+      "reference": "IC2",
+      "pin": "27"
+    },
+    {
+      "reference": "C15",
+      "pin": "1"
+    },
+    {
+      "reference": "C16",
+      "pin": "1"
+    },
+    {
+      "reference": "C17",
+      "pin": "1"
+    },
+    {
+      "reference": "C18",
+      "pin": "1"
+    }
+  ],
+  "PGND": [
+    {
+      "reference": "C15",
+      "pin": "2"
+    },
+    {
+      "reference": "C16",
+      "pin": "2"
+    },
+    {
+      "reference": "C17",
+      "pin": "2"
+    },
+    {
+      "reference": "C18",
+      "pin": "2"
+    },
+    {
+      "reference": "IC2",
+      "pin": "15"
+    },
+    {
+      "reference": "IC2",
+      "pin": "16"
+    },
+    {
+      "reference": "IC2",
+      "pin": "21"
+    },
+    {
+      "reference": "IC2",
+      "pin": "22"
+    },
+    {
+      "reference": "NT1",
+      "pin": "1"
+    }
+  ],
+  "OUTA_P": [
+    {
+      "reference": "IC2",
+      "pin": "13"
+    },
+    {
+      "reference": "IC2",
+      "pin": "14"
+    },
+    {
+      "reference": "J4",
+      "pin": "1"
+    }
+  ],
+  "OUTA_N": [
+    {
+      "reference": "IC2",
+      "pin": "17"
+    },
+    {
+      "reference": "IC2",
+      "pin": "18"
+    },
+    {
+      "reference": "J4",
+      "pin": "2"
+    }
+  ],
+  "OUTB_P": [
+    {
+      "reference": "IC2",
+      "pin": "23"
+    },
+    {
+      "reference": "IC2",
+      "pin": "24"
+    },
+    {
+      "reference": "J4",
+      "pin": "3"
+    }
+  ],
+  "OUTB_N": [
+    {
+      "reference": "IC2",
+      "pin": "19"
+    },
+    {
+      "reference": "IC2",
+      "pin": "20"
+    },
+    {
+      "reference": "J4",
+      "pin": "4"
+    }
+  ]
+}

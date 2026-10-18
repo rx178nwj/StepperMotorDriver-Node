@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'DFE322520FD_4R7M=P2'
+CLASS = DISCRETE
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "Murata Electronics", "DFE322520FD-4R7M=P2" (!) = "", "DFE322520FD1R0MP2", "Other", "81-DFE322520FD4R7MP2", "https://www.mouser.co.uk/ProductDetail/Murata-Electronics/DFE322520FD-4R7M%3dP2?qs=17u8i%2FzlE8%252BgAY54mivQ1g%3D%3D", "DFE322520F_D Series Inductor 4.7uH +/-20% 1210 (3225)", "https://search.murata.co.jp/Ceramy/image/img/P02/J(E)TE243A-9104.pdf", "2 mm"
+END_PART
+
+END.

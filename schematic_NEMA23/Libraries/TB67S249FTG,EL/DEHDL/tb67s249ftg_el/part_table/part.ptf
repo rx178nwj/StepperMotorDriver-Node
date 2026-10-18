@@ -1,0 +1,11 @@
+FILE_TYPE = MULTI_PHYS_TABLE;
+
+PART 'TB67S249FTG_EL'
+CLASS = IC
+{========================================================================================}
+:"MANUFACTURER_NAME", "MANUFACTURER_PART_NUMBER"= "PART_NUMBER", "JEDEC_TYPE", "PACK_TYPE", "MOUSER_PART_NUMBER", "MOUSER_PRICE/STOCK", "DESCRIPTION", "DATASHEET", "HEIGHT";
+{========================================================================================}
+ "Toshiba", "TB67S249FTG,EL" (!) = "", "QFN50P700X700X100-49N-D", "Quad Flat No-Lead", "757-TB67S249FTGEL", "https://www.mouser.co.uk/ProductDetail/Toshiba/TB67S249FTGEL?qs=1mbolxNpo8fmTK3GoCnwKw%3D%3D", "Motor / Motion / Ignition Controllers & Drivers Stepping Motor Driver IC 50V 4.5A", "http://toshiba.semicon-storage.com/info/docget.jsp?did=58560&prodName=TB67S249FTG", "1 mm"
+END_PART
+
+END.

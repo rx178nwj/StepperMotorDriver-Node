@@ -1,0 +1,16 @@
+.TPS2116DRLR :1 ;d
+TPS62932DRLR
+*STM IC
+*NGS
+*PLB 1="GND" 2="VOUT_1" 3="VIN1" 4="PR1" 5="MODE" 6="VIN2" 7="VOUT_2" 8="ST"
+*MXP 8
+*DFN TPS2116DRLR
+~!Mouser Part Number (595-TPS2116DRLR)
+~!Link Mouser Price/Stock (https://www.mouser.co.uk/ProductDetail/Texas-Instruments/TPS2116DRLR?qs=aP1CjGhiNiGo3XAyXcVPaQ%3D%3D)
+~!Manufacturer_Name (Texas Instruments)
+~!Manufacturer_Part_Number (TPS2116DRLR)
+~!Link Datasheet (https://www.ti.com/lit/gpn/tps2116)
+~!Height (0.6mm)
+~!3D_Model (TPS2116DRLR)
+TPS2116DRLR
+1.1!U 2.1!U 3.1!U 4.1!U 5.1!U 6.1!U 7.1!U 8.1!U 

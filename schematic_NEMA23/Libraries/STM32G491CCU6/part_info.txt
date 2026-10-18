@@ -1,0 +1,9 @@
+Manufacturer=STMicroelectronics
+PartNumber=STM32G491CCU6
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=49
+Version=2.1
+Released=2021-06-24 11:02:12
+Downloaded=2026-09-27 14:53:43
+3D=Y
