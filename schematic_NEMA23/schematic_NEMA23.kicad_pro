@@ -1237,7 +1237,7 @@
         "uuid": "9fdd081c-730e-4fc3-b866-b3cdf49e5309"
       }
     ],
-    "used_designators": "U1-10,U20,C1-43,#PWR1-112,L1-2,#FLG1-9,#FLG101-102,R1-48,IC1-4,SW1-5,TH1,J1-11,D1-7,NT1-2,TP1-2,S1-4,MOTVREF_TP1-3",
+    "used_designators": "U1-10,U20,C1-43,L1-2,#PWR1-112,IC1-4,#FLG1-9,#FLG101-102,R1-48,SW1-5,TH1,J1-11,D1-7,NT1-2,TP1-2,S1-4,MOTVREF_TP1-3",
     "variants": []
   },
   "sheets": [
