@@ -27,12 +27,16 @@ typedef struct {
     uint16_t gear_ratio;       /* モータ軸 : 出力軸、1〜1000 */
     uint16_t sensor_offset;    /* 出力軸の原点に対する RAW ANGLE、0〜4095 */
     uint8_t  pa7_mode;         /* 0 AD_IN、1 DIR、2 Z */
-    uint8_t  reserved[3];      /* 常に 0（メモリ比較・保存でパディングの不定値を避ける） */
-} settings_t;
+    /* ---- 以下はレコード版 3 で追加（J10、3.12 節）。版 1・2 のレコードは既定値で補う ---- */
+    uint8_t  j10_mode;         /* 0 未使用、1 ENC、2 HOME */
+    uint16_t home_speed;       /* 原点復帰の探索速度 [step/s]、1〜65535 */
+} settings_t;                  /* パディングなし（メモリ比較・保存でパディングの不定値を避ける） */
 
 #define SETTINGS_FLAG_INVERT_DIR  (1u << 0)
 #define SETTINGS_FLAG_LOCAL_JOG   (1u << 1)
 #define SETTINGS_FLAG_SENSOR_DIR  (1u << 2)   /* PA7_MODE=1 のとき AS5600 の DIR ピンの出力レベル */
+#define SETTINGS_FLAG_AGC         (1u << 3)   /* AGC 有効（3.11 節） */
+#define SETTINGS_FLAG_HOME_ACTIVE_HIGH (1u << 4)   /* HOME 入力の論理: 1 = アクティブ High（3.12 節） */
 
 void settings_defaults(settings_t *s);
 /* 範囲外の値を丸める。丸めた項目があれば true */

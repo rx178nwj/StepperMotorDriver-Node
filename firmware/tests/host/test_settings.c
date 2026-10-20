@@ -194,7 +194,7 @@ static void mk(settings_t *s, unsigned i)
     s->run_current_ma = (uint16_t)(250u + i);
     s->hold_current_ma = (uint16_t)(300u + i);
     s->microstep = (uint8_t)(1u << (i % 6u));
-    s->flags = (uint8_t)(i & 7u);
+    s->flags = (uint8_t)(i & 0x1Fu);
     s->comm_timeout_ms = (uint16_t)(i * 3u);
     s->max_speed = 1000u + i;
     s->accel = 2000u + i;
@@ -206,6 +206,8 @@ static void mk(settings_t *s, unsigned i)
     s->gear_ratio = (uint16_t)(1u + i % 1000u);
     s->sensor_offset = (uint16_t)(i % 4096u);
     s->pa7_mode = (uint8_t)(i % 3u);
+    s->j10_mode = (uint8_t)(i % 3u);
+    s->home_speed = (uint16_t)(1u + i * 7u);
 }
 
 static bool same(const settings_t *a, const settings_t *b)
@@ -241,7 +243,7 @@ static uint32_t crc32_ref(const uint8_t *p, uint32_t n)
     return ~c;
 }
 
-/* 旧版・新版のレコード（64 バイト）を組み立てる。ver 1 は先頭 32 バイトの設定だけ、ver 2 は 40 バイト */
+/* 旧版・新版のレコード（64 バイト）を組み立てる。ver 1 は先頭 32 バイトの設定だけ、ver 2・3 は 40 バイト */
 static void build_rec(uint8_t *rec, unsigned ver, uint32_t seq, const settings_t *s)
 {
     uint16_t v = (uint16_t)ver;
@@ -291,7 +293,8 @@ static void test_defaults(void)
     CHECK(s.gear_ratio == 20);
     CHECK(s.sensor_offset == 0);
     CHECK(s.pa7_mode == 1);
-    CHECK(s.reserved[0] == 0 && s.reserved[1] == 0 && s.reserved[2] == 0);
+    CHECK(s.j10_mode == 0);
+    CHECK(s.home_speed == 800);
 
     /* 工場出荷値は範囲内（丸めが起きない） */
     settings_t t = s;
@@ -362,9 +365,23 @@ static void test_sanitize_in_range(void)
         settings_t e = s;
         CHECK(!settings_sanitize(&s));
         CHECK(same(&s, &e));
+
+        s = d;
+        s.j10_mode = m;       /* J10_MODE 0〜2 */
+        e = s;
+        CHECK(!settings_sanitize(&s));
+        CHECK(same(&s, &e));
     }
-    /* FLAGS: bit0〜2（方向反転・ローカルジョグ・センサ方向）は有効 */
-    for (uint8_t f = 0; f <= 7; f++) {
+    static const uint16_t hs[] = {1, 2, 800, 65534, 65535};   /* HOME_SPEED 1〜65535 */
+    for (unsigned i = 0; i < sizeof hs / sizeof hs[0]; i++) {
+        s = d;
+        s.home_speed = hs[i];
+        settings_t e = s;
+        CHECK(!settings_sanitize(&s));
+        CHECK(same(&s, &e));
+    }
+    /* FLAGS: bit0〜4（方向反転・ローカルジョグ・センサ方向・AGC・HOME 論理）は有効 */
+    for (uint8_t f = 0; f <= 0x1F; f++) {
         s = d;
         s.flags = f;
         settings_t e = s;
@@ -477,9 +494,25 @@ static void test_sanitize_out_of_range(void)
         s.pa7_mode = d.pa7_mode;
         CHECK(same(&s, &d));
     }
-    /* FLAGS の未定義ビット（bit5〜7）は落とし、定義済みの bit0〜2 は残す */
+    /* J10_MODE 0〜2。範囲外は 0（既定）に丸める */
+    static const uint8_t badj10[] = {3, 4, 100, 255};
+    for (unsigned i = 0; i < sizeof badj10; i++) {
+        s = d;
+        s.j10_mode = badj10[i];
+        CHECK(settings_sanitize(&s));
+        CHECK(s.j10_mode == 0);
+        CHECK(same(&s, &d));
+    }
+    /* HOME_SPEED 1〜65535。0 は 1 に丸める */
+    s = d;
+    s.home_speed = 0;
+    e = d;
+    e.home_speed = 1;
+    CHECK(settings_sanitize(&s));
+    CHECK(same(&s, &e));
+    /* FLAGS の未定義ビット（bit5〜7）は落とし、定義済みの bit0〜4 は残す */
     for (unsigned hi = 0x20; hi <= 0xE0; hi += 0x20) {
-        for (uint8_t lo = 0; lo <= 7; lo++) {
+        for (uint8_t lo = 0; lo <= 0x1F; lo++) {
             s = d;
             s.flags = (uint8_t)(hi | lo);
             e = d;
@@ -499,9 +532,7 @@ static void test_sanitize_out_of_range(void)
     CHECK(!settings_sanitize(&s));       /* 2 回目は何も変わらない */
 }
 
-/* 保留: 3.8 節の 0x25 FLAGS は bit3（AGC 有効）・bit4（HOME 論理）も定義済みで FR-NV-01 で保存対象だが、
- * 現行の settings_sanitize は bit3・bit4 を落とす（flags_mask が bit0〜2 のみ）。P2 の未実装と思われるため保留。
- *   入力 flags=0x18 → 期待 0x18・戻り値 false（仕様）、実際 0x00・true
+/* 3.8 節の 0x25 FLAGS の bit3（AGC 有効）・bit4（HOME 論理）も定義済みで FR-NV-01 で保存対象。落とさない */
 static void test_sanitize_flags_p2(void)
 {
     settings_t s;
@@ -509,8 +540,10 @@ static void test_sanitize_flags_p2(void)
     s.flags = 0x1F;
     CHECK(!settings_sanitize(&s));
     CHECK(s.flags == 0x1F);
+    s.flags = 0x18;
+    CHECK(!settings_sanitize(&s));
+    CHECK(s.flags == 0x18);
 }
- */
 
 /* ---------------------------------------------------------------- 試験 12（FR-NV-03・05）: 保存と読み込み */
 
@@ -562,7 +595,7 @@ static void test_save_load(void)
     m.run_current_ma = 3000;
     m.hold_current_ma = 250;
     m.microstep = 32;
-    m.flags = 7;
+    m.flags = 0x1F;
     m.comm_timeout_ms = 0xFFFF;
     m.max_speed = 100000;
     m.accel = 10000000;
@@ -574,6 +607,8 @@ static void test_save_load(void)
     m.gear_ratio = 1000;
     m.sensor_offset = 4095;
     m.pa7_mode = 2;
+    m.j10_mode = 2;
+    m.home_speed = 0xFFFF;
     CHECK(settings_save(&m));
     CHECK(settings_load(&got));
     CHECK(same(&got, &m));
@@ -628,7 +663,7 @@ static void test_page_switch_keeps_previous(void)
     uint8_t rec[REC_SIZE];
     settings_t s;
     mk(&s, 32);
-    build_rec(rec, 2, rec_seq(0, 31), &s);
+    build_rec(rec, 3, rec_seq(0, 31), &s);
     CHECK(memcmp(rec, slot_ptr(0, 31), REC_SIZE) == 0);
 }
 
@@ -775,14 +810,14 @@ static void test_power_cut_during_erase(void)
     }
 }
 
-/* ---------------------------------------------------------------- FR-POS-08: 旧版のレコード */
+/* ---------------------------------------------------------------- FR-POS-08・FR-NV-01: 旧版のレコード */
 
 static void test_old_versions(void)
 {
     settings_t d, v1s;
     settings_defaults(&d);
     mk(&v1s, 11);
-    /* 版 1 の設定は先頭 32 バイトだけ。新項目（ギヤ比・オフセット・PA7_MODE）に当たる後ろは書かれていない */
+    /* 版 1 の設定は先頭 32 バイトだけ。新項目（ギヤ比・オフセット・PA7_MODE・J10_MODE・HOME_SPEED）に当たる後ろは書かれていない */
     settings_t expect = d;
     memcpy(&expect, &v1s, 32);
 
@@ -795,27 +830,55 @@ static void test_old_versions(void)
     CHECK(settings_load(&got));
     CHECK(same(&got, &expect));
     CHECK(got.gear_ratio == 20 && got.sensor_offset == 0 && got.pa7_mode == 1);
+    CHECK(got.j10_mode == 0 && got.home_speed == 800);
     CHECK(got.run_current_ma == v1s.run_current_ma && got.steps_per_rev == v1s.steps_per_rev);
     CHECK(got.hold_delay_ms == v1s.hold_delay_ms && got.jog_speed == v1s.jog_speed);
-    CHECK(got.reserved[0] == 0 && got.reserved[1] == 0 && got.reserved[2] == 0);
 
     /* 版 1 のあとに保存すると追記され、新しい版で読める */
     CHECK(save_i(3));
     CHECK(loads_as(3));
     CHECK(rec_seq(0, 1) == 6);           /* 連番は版 1 の続き */
 
-    /* 版 2 の完全なレコード */
-    settings_t v2s;
-    mk(&v2s, 21);
+    /* 版 2 の完全なレコード（位置センサの項目あり）。版 2 では 37〜39 バイト目は予約で、新項目は既定値になる。
+     * 予約領域に 0 以外が入っていても使わないことを見るため、mk の J10_MODE・HOME_SPEED をそのまま書いておく */
+    settings_t v2s, v2e;
+    mk(&v2s, 22);
+    CHECK(v2s.j10_mode != 0 && v2s.home_speed != 800);
+    v2e = v2s;
+    v2e.j10_mode = 0;
+    v2e.home_speed = 800;
     flash_reset();
     build_rec(rec, 2, 9, &v2s);
     memcpy(slot_ptr(1, 4), rec, REC_SIZE);
     CHECK(settings_load(&got));
-    CHECK(same(&got, &v2s));
+    CHECK(same(&got, &v2e));
+    CHECK(got.gear_ratio == v2s.gear_ratio && got.sensor_offset == v2s.sensor_offset && got.pa7_mode == v2s.pa7_mode);
+    /* 版 2 で予約が 0 の実際のレコードも同じ */
+    v2s.j10_mode = 0;
+    v2s.home_speed = 0;
+    build_rec(rec, 2, 10, &v2s);
+    memcpy(slot_ptr(1, 5), rec, REC_SIZE);
+    CHECK(settings_load(&got));
+    CHECK(same(&got, &v2e));
+    mk(&v2s, 22);
 
-    /* 版 1 と版 2 が混在: 連番が大きい方が最新 */
+    /* 版 2 のあとに保存すると追記され、版 3 で読める */
+    CHECK(save_i(4));
+    CHECK(loads_as(4));
+
+    /* 版 3 の完全なレコード */
+    settings_t v3s;
+    mk(&v3s, 23);
     flash_reset();
-    build_rec(rec, 2, 3, &v2s);
+    build_rec(rec, 3, 9, &v3s);
+    memcpy(slot_ptr(1, 4), rec, REC_SIZE);
+    CHECK(settings_load(&got));
+    CHECK(same(&got, &v3s));
+    CHECK(got.j10_mode == v3s.j10_mode && got.home_speed == v3s.home_speed);
+
+    /* 版 1・2・3 が混在: 連番が大きい方が最新 */
+    flash_reset();
+    build_rec(rec, 3, 3, &v3s);
     memcpy(slot_ptr(0, 0), rec, REC_SIZE);
     build_rec(rec, 1, 4, &v1s);
     memcpy(slot_ptr(0, 1), rec, REC_SIZE);
@@ -824,7 +887,11 @@ static void test_old_versions(void)
     build_rec(rec, 2, 5, &v2s);
     memcpy(slot_ptr(1, 0), rec, REC_SIZE);
     CHECK(settings_load(&got));
-    CHECK(same(&got, &v2s));
+    CHECK(same(&got, &v2e));
+    build_rec(rec, 3, 6, &v3s);
+    memcpy(slot_ptr(1, 1), rec, REC_SIZE);
+    CHECK(settings_load(&got));
+    CHECK(same(&got, &v3s));
 
     /* 版 1 で CRC が合わないもの、未知の版は無視 */
     flash_reset();
@@ -832,8 +899,8 @@ static void test_old_versions(void)
     rec[OFF_SETTINGS + 3] ^= 0x10;
     memcpy(slot_ptr(0, 0), rec, REC_SIZE);
     CHECK(!settings_load(&got));
-    uint16_t bad_ver = 3;
-    build_rec(rec, 2, 6, &v2s);
+    uint16_t bad_ver = 4;
+    build_rec(rec, 3, 6, &v3s);
     memcpy(rec + OFF_VERSION, &bad_ver, 2);
     uint32_t crc = crc32_ref(rec, OFF_CRC);
     memcpy(rec + OFF_CRC, &crc, 4);      /* CRC は合っているが版が未知 */
@@ -892,6 +959,7 @@ int main(void)
     RUN(test_defaults);
     RUN(test_sanitize_in_range);
     RUN(test_sanitize_out_of_range);
+    RUN(test_sanitize_flags_p2);
     RUN(test_load_empty);
     RUN(test_save_load);
     RUN(test_seq_and_pages);

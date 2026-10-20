@@ -94,6 +94,18 @@ bool drv_is_enabled(void)
     return (DRV_EN_PORT->ODR & DRV_EN_PIN) != 0;
 }
 
+/* AGC0/AGC1 を同じレベルで出す（FR-AGC-02）。1 回の BSRR 書き込みで両方を変える */
+void drv_set_agc(bool on)
+{
+    const uint32_t both = DRV_AGC0_PIN | DRV_AGC1_PIN;
+    DRV_AGC_PORT->BSRR = on ? both : (both << 16);
+}
+
+bool drv_get_agc(void)
+{
+    return (DRV_AGC_PORT->ODR & (DRV_AGC0_PIN | DRV_AGC1_PIN)) == (DRV_AGC0_PIN | DRV_AGC1_PIN);
+}
+
 void drv_set_current_ma(uint16_t ma, uint32_t vdda_mv)
 {
     if (ma < CURRENT_MIN_MA) ma = CURRENT_MIN_MA;

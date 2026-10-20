@@ -17,10 +17,12 @@
 #define REC_SIZE       64u
 #define REC_PER_PAGE   (FLASH_PAGE_SIZE / REC_SIZE)
 #define REC_MAGIC      0x4D53454Eu   /* "NESM" */
-#define REC_VERSION    2u
-/* 版 1: settings_t が 32 バイト（s の後ろの予約 12 バイト + CRC）。版 2 は s が 40 バイトで、
- * 新項目は版 1 の s の直後に追加しただけなので、CRC の位置は同じ。版 1 は新項目を既定値で補って読む */
+#define REC_VERSION    3u
+/* 版 1: settings_t が 32 バイト（s の後ろの予約 12 バイト + CRC）。版 2 は s が 40 バイト（位置センサの項目を追加）、
+ * 版 3 も 40 バイト（版 2 の予約 3 バイトを J10_MODE・HOME_SPEED に置き換え）で、
+ * 新項目は s の直後に追加しただけなので CRC の位置は同じ。旧版は新項目を既定値で補って読む */
 #define REC_VERSION_V1 1u
+#define REC_VERSION_V2 2u
 #define SETTINGS_V1_SIZE 32u
 
 typedef struct {
@@ -40,6 +42,7 @@ typedef struct {
 
 _Static_assert(sizeof(settings_t) == 40, "settings_t layout changed: bump REC_VERSION");
 _Static_assert(offsetof(settings_t, gear_ratio) == SETTINGS_V1_SIZE, "v1 fields must stay in place");
+_Static_assert(offsetof(settings_t, j10_mode) + 3u == sizeof(settings_t), "v3 fields must fill the v2 reserved area");
 _Static_assert(sizeof(record_t) == REC_SIZE, "record size");
 _Static_assert(offsetof(record_t, crc) == REC_SIZE - 4u, "crc must stay at the end (v1 compatible)");
 
@@ -76,6 +79,8 @@ void settings_defaults(settings_t *s)
     s->gear_ratio = DEF_GEAR_RATIO;
     s->sensor_offset = DEF_SENSOR_OFFSET;
     s->pa7_mode = DEF_PA7_MODE;
+    s->j10_mode = DEF_J10_MODE;
+    s->home_speed = DEF_HOME_SPEED;
 }
 
 static bool clamp16(uint16_t *v, uint16_t lo, uint16_t hi)
@@ -103,7 +108,8 @@ bool settings_sanitize(settings_t *s)
         s->microstep = DEF_MICROSTEP;
         changed = true;
     }
-    const uint8_t flags_mask = SETTINGS_FLAG_INVERT_DIR | SETTINGS_FLAG_LOCAL_JOG | SETTINGS_FLAG_SENSOR_DIR;
+    const uint8_t flags_mask = SETTINGS_FLAG_INVERT_DIR | SETTINGS_FLAG_LOCAL_JOG | SETTINGS_FLAG_SENSOR_DIR |
+                               SETTINGS_FLAG_AGC | SETTINGS_FLAG_HOME_ACTIVE_HIGH;
     if (s->flags & ~flags_mask) {
         s->flags &= flags_mask;
         changed = true;
@@ -121,6 +127,11 @@ bool settings_sanitize(settings_t *s)
         s->pa7_mode = DEF_PA7_MODE;
         changed = true;
     }
+    if (s->j10_mode > 2u) {
+        s->j10_mode = DEF_J10_MODE;
+        changed = true;
+    }
+    changed |= clamp16(&s->home_speed, 1u, 0xFFFFu);
     return changed;
 }
 
@@ -161,7 +172,7 @@ static slot_state_t read_slot(uint32_t addr, record_t *r)
     if (blank) {
         return SLOT_BLANK;
     }
-    bool layout_ok = (r->version == REC_VERSION && r->size == sizeof(settings_t)) ||
+    bool layout_ok = ((r->version == REC_VERSION || r->version == REC_VERSION_V2) && r->size == sizeof(settings_t)) ||
                      (r->version == REC_VERSION_V1 && r->size == SETTINGS_V1_SIZE);
     if (r->magic == REC_MAGIC && layout_ok &&
         r->crc == crc32((const uint8_t *)r, offsetof(record_t, crc))) {
@@ -204,11 +215,15 @@ bool settings_load(settings_t *s)
         return false;
     }
     if (l.rec.version == REC_VERSION_V1) {
-        settings_defaults(s);                       /* 新項目（位置センサ関連）は既定値 */
+        settings_defaults(s);                       /* 新項目（位置センサ・J10 関連）は既定値 */
         memcpy(s, &l.rec.s, SETTINGS_V1_SIZE);
     } else {
         *s = l.rec.s;
-        memset(s->reserved, 0, sizeof s->reserved);
+        if (l.rec.version == REC_VERSION_V2) {
+            /* 版 2 では同じ位置が予約領域（0）だった。新項目は既定値にする */
+            s->j10_mode = DEF_J10_MODE;
+            s->home_speed = DEF_HOME_SPEED;
+        }
     }
     return true;
 }

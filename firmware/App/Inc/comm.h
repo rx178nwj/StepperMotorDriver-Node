@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define REG_MAP_SIZE      0x59u   /* レジスタマップの末尾（0x58 PA7_MODE まで）。これ以降は読むと 0xFF */
+#define REG_MAP_SIZE      0x60u   /* レジスタマップの末尾（0x5F ENC_COUNT まで）。これ以降は読むと 0xFF */
 #define COMM_READ_MAX     6u      /* 1 フレームで読み書きできる最大バイト数 */
 #define COMM_RESP_MAX     1u      /* 1 要求あたりの最大応答フレーム数 */
 

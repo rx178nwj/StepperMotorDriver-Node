@@ -80,6 +80,8 @@
 #define DEF_GEAR_RATIO          20u          /* 出力軸 1 回転あたりのモータ回転数（U-11） */
 #define DEF_SENSOR_OFFSET       0u
 #define DEF_PA7_MODE            1u           /* 1 = DIR（AS5600 の DIR ピンを駆動） */
+#define DEF_J10_MODE            0u           /* 0 = 未使用（PA15/PA1 はアナログ入力） */
+#define DEF_HOME_SPEED          800u         /* 原点復帰の探索速度 [step/s] */
 
 /* ---- 出力軸の位置センサ AS5600（I2C1、要求仕様 3.10 節）---- */
 #define GEAR_RATIO_MAX          1000u

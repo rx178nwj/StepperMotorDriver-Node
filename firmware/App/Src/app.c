@@ -40,6 +40,10 @@ static uint8_t sensor_status_snapshot; /* SENSOR_STATUS レジスタの値（10 
 static uint16_t shaft_angle_snapshot;  /* SHAFT_ANGLE レジスタの値（10 ms 周期。USB の名前表で公開） */
 
 static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID, .ad_in_mv = 0xFFFFu };
+/* J10（3.12 節）。入力と ENC は E3・E4 で実装するまで常に 0 */
+static uint8_t j10_input_status;   /* INPUT_STATUS レジスタ（0x1E） */
+static int32_t enc_count;          /* ENC_COUNT レジスタ（0x5C） */
+
 static bool vm_ok;
 static uint32_t vm_good_ms;
 static uint8_t vm_bad_count;
@@ -76,8 +80,15 @@ static void apply_stepper_params(void)
     stepper_set_params(&p);
 }
 
+/* 保存値（RAM の設定）の AGC を端子へ出す。EN=Low の間だけ呼ぶ（FR-AGC-03） */
+static void agc_apply(void)
+{
+    drv_set_agc((cfg.flags & SETTINGS_FLAG_AGC) != 0);
+}
+
 static void driver_wake(void)
 {
+    agc_apply();   /* スタンバイを解除する前に AGC を設定する（FR-AGC-03） */
     drv_set_current_ma(cfg.hold_current_ma, mon.vdda_mv);
     drv_wake(cfg.microstep);
     lo_armed = false;
@@ -87,6 +98,7 @@ static void driver_wake(void)
 static void driver_sleep(void)
 {
     drv_enable(false);
+    agc_apply();   /* ENABLED 中の LOAD・FACTORY で変えた AGC は、EN=Low になったここで反映する */
     stepper_estop();
     drv_standby();
     drv_set_current_min();
@@ -130,6 +142,7 @@ static uint8_t cmd_disable(void)
     }
     stepper_estop();
     drv_enable(false);
+    agc_apply();   /* ENABLED 中の LOAD・FACTORY で変えた AGC は、EN=Low になったここで反映する */
     jog_dir = 0;
     state = APP_DISABLED;
     return RESULT_OK;
@@ -262,7 +275,7 @@ static const reg_def_t writable[] = {
     {0x20, 2}, {0x22, 2}, {0x24, 1}, {0x25, 1}, {0x26, 2},
     {0x28, 4}, {0x2C, 4}, {0x30, 4}, {0x34, 4}, {0x38, 4}, {0x3C, 2}, {0x3E, 2},
     {0x40, 4}, {0x44, 4}, {0x48, 4}, {0x4C, 4}, {0x50, 1},
-    {0x54, 2}, {0x56, 2}, {0x58, 1},
+    {0x54, 2}, {0x56, 2}, {0x58, 1}, {0x59, 1}, {0x5A, 2},
 };
 
 static bool motion_idle(void)
@@ -275,6 +288,12 @@ static void apply_settings(void)
 {
     apply_stepper_params();
     position_pa7_set(cfg.pa7_mode, (cfg.flags & SETTINGS_FLAG_SENSOR_DIR) != 0);
+    /* TODO(E3): J10_MODE に合わせて PA15/PA1 の端子を切り替える */
+    /* AGC は EN=Low の間だけ端子へ出す。ENABLED 中（LOAD・FACTORY のみここへ来る）は RAM の設定だけ変え、
+     * 端子は次に EN=Low になったとき（cmd_disable・driver_sleep）に agc_apply で反映する */
+    if (state != APP_ENABLED) {
+        agc_apply();
+    }
     if (drv_is_awake()) {
         drv_wake(cfg.microstep);   /* 起床中は DMODE の書き換えのみ */
         bool run = state == APP_ENABLED && !hold_active;
@@ -302,6 +321,8 @@ static uint8_t write_setting(uint8_t addr, const uint8_t *p)
     case 0x54: t.gear_ratio = rd16(p); break;
     case 0x56: t.sensor_offset = rd16(p); break;
     case 0x58: t.pa7_mode = p[0]; break;
+    case 0x59: t.j10_mode = p[0]; break;
+    case 0x5A: t.home_speed = rd16(p); break;
     default: return RESULT_INVALID;
     }
     if (settings_sanitize(&t)) {
@@ -309,6 +330,12 @@ static uint8_t write_setting(uint8_t addr, const uint8_t *p)
     }
     if (t.microstep != cfg.microstep && !motion_idle()) {
         return RESULT_REJECTED;   /* 位置の単位が変わるため停止中のみ */
+    }
+    if (addr == 0x59 && !motion_idle()) {
+        return RESULT_REJECTED;   /* J10_MODE は停止中のみ（FR-J10-02） */
+    }
+    if (addr == 0x25 && ((t.flags ^ cfg.flags) & SETTINGS_FLAG_AGC) && state == APP_ENABLED) {
+        return RESULT_REJECTED;   /* ENABLED 中は AGC を変えない。FLAGS 全体を反映しない（FR-AGC-03） */
     }
     if (memcmp(&t, &cfg, sizeof t) != 0) {
         cfg = t;
@@ -414,7 +441,8 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     m[0x19] = sensor_status_bits();
     wr16(&m[0x1A], position_raw());
     wr16(&m[0x1C], position_shaft_angle(position_raw(), cfg.sensor_offset));
-    /* 0x1E〜0x1F は予約（0） */
+    m[0x1E] = j10_input_status;
+    /* 0x1F は予約（0） */
     wr16(&m[0x20], cfg.run_current_ma);
     wr16(&m[0x22], cfg.hold_current_ma);
     m[0x24] = cfg.microstep;
@@ -430,6 +458,9 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     wr16(&m[0x54], cfg.gear_ratio);
     wr16(&m[0x56], cfg.sensor_offset);
     m[0x58] = cfg.pa7_mode;
+    m[0x59] = cfg.j10_mode;
+    wr16(&m[0x5A], cfg.home_speed);
+    wr32(&m[0x5C], (uint32_t)enc_count);
 
     for (uint32_t i = 0; i < len; i++) {
         uint32_t a = (uint32_t)reg + i;

@@ -26,6 +26,11 @@ bool drv_is_awake(void);
 void drv_enable(bool on);
 bool drv_is_enabled(void);
 
+/* AGC0/AGC1 を同じレベルで出す（ON=両方 High、OFF=両方 Low。(High, Low) は使わない）。
+ * 呼ぶのは EN=Low の間だけ（動作中に AGC0 を切り替えない）。drv_get_agc は出力レベルが両方 High なら true */
+void drv_set_agc(bool on);
+bool drv_get_agc(void);
+
 /* 電流 [mA]（CURRENT_MIN_MA〜CURRENT_LIMIT_MA に制限）。VDDA [mV] で DAC コードを補正する */
 void drv_set_current_ma(uint16_t ma, uint32_t vdda_mv);
 /* DAC 最小出力（約 0.2 V）。電流を 0 にするには ENABLE を Low にする */

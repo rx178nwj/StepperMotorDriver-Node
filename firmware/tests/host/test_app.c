@@ -104,18 +104,39 @@ int32_t stepper_speed(void)
 /* ---------------------------------------------------------------- 偽物：drv、monitor、position、ui、comm、board */
 
 static bool g_awake;
+static bool g_agc;                  /* AGC0/AGC1 の端子レベル（両方同じ。FR-AGC-02） */
+static unsigned g_agc_calls;        /* drv_set_agc の呼び出し回数 */
+static unsigned g_arm_calls;        /* drv_fault_irq_arm の呼び出し回数 */
+static drv_fault_t g_lo_fault;      /* drv_read_fault が返す値 */
+/* drv の呼び出し順序（W 起床、Z スタンバイ、N 励磁 ON、D 励磁 OFF、A AGC 両方 High、a AGC 両方 Low） */
+static char g_dlog[64];
+static unsigned g_dlog_n;
+static void dlog(char c)
+{
+    if (g_dlog_n < sizeof g_dlog - 1u) {
+        g_dlog[g_dlog_n++] = c;
+        g_dlog[g_dlog_n] = 0;
+    }
+}
+static void dlog_clear(void)
+{
+    g_dlog_n = 0;
+    g_dlog[0] = 0;
+}
 bool drv_microstep_valid(uint8_t m) { return m == 1u || m == 2u || m == 4u || m == 8u || m == 16u || m == 32u; }
 void drv_init(void) {}
-void drv_wake(uint8_t m) { (void)m; g_awake = true; }
-void drv_standby(void) { g_awake = false; }
+void drv_wake(uint8_t m) { (void)m; g_awake = true; dlog('W'); }
+void drv_standby(void) { g_awake = false; dlog('Z'); }
 bool drv_is_awake(void) { return g_awake; }
-void drv_enable(bool on) { (void)on; }
+void drv_enable(bool on) { dlog(on ? 'N' : 'D'); }
 bool drv_is_enabled(void) { return false; }
+void drv_set_agc(bool on) { g_agc = on; g_agc_calls++; dlog(on ? 'A' : 'a'); }
+bool drv_get_agc(void) { return g_agc; }
 void drv_set_current_ma(uint16_t ma, uint32_t v) { (void)ma; (void)v; }
 void drv_set_current_min(void) {}
 void drv_pulse_reset(void) {}
-drv_fault_t drv_read_fault(void) { return DRV_FAULT_NONE; }
-void drv_fault_irq_arm(bool a) { (void)a; }
+drv_fault_t drv_read_fault(void) { return g_lo_fault; }
+void drv_fault_irq_arm(bool a) { (void)a; g_arm_calls++; }
 
 static uint32_t g_vm_mv = 24000;
 void monitor_init(void) {}
@@ -159,14 +180,56 @@ bool comm_bus_degraded(void) { return false; }
 uint8_t board_read_address_id(void) { return 5; }
 bool board_pwr_external(void) { return false; }
 
-/* ---------------------------------------------------------------- 偽物：Flash（保存設定なし） */
+/* ---------------------------------------------------------------- 偽物：Flash（既定は保存設定なし） */
 
 FLASH_TypeDef g_flash_regs;
 
+#define NV_PAGE_BYTES 2048u
+static uint8_t g_nv[2u * NV_PAGE_BYTES];   /* 設定領域（2 ページ）。nv_clear で消去状態（保存設定なし）にする */
+
 void test_nv_memcpy(void *dst, uint32_t addr, uint32_t n)
 {
-    (void)addr;
-    memset(dst, 0xFF, n);   /* 消去済み＝有効なレコードなし */
+    uint32_t off = addr - NV_BASE;
+    if (off + n <= sizeof g_nv) {
+        memcpy(dst, &g_nv[off], n);
+    } else {
+        memset(dst, 0xFF, n);
+    }
+}
+
+static void nv_clear(void)
+{
+    memset(g_nv, 0xFF, sizeof g_nv);
+}
+
+static uint32_t crc32_ref(const uint8_t *p, uint32_t n)
+{
+    uint32_t c = 0xFFFFFFFFu;
+    while (n--) {
+        c ^= *p++;
+        for (int k = 0; k < 8; k++) {
+            c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+        }
+    }
+    return ~c;
+}
+
+/* 保存設定（版 3、連番 1）を 1 件置く。レコードは settings.c と同じ 64 バイト（"NESM"、版、大きさ、連番、設定、CRC） */
+static void nv_put(const settings_t *s)
+{
+    uint8_t rec[64];
+    memset(rec, 0xFF, sizeof rec);
+    uint32_t magic = 0x4D53454Eu;
+    uint16_t ver = 3, size = 40;
+    uint32_t seq = 1;
+    memcpy(rec + 0, &magic, 4);
+    memcpy(rec + 4, &ver, 2);
+    memcpy(rec + 6, &size, 2);
+    memcpy(rec + 8, &seq, 4);
+    memcpy(rec + 16, s, 40);
+    uint32_t crc = crc32_ref(rec, 60);
+    memcpy(rec + 60, &crc, 4);
+    memcpy(g_nv, rec, sizeof rec);
 }
 
 HAL_StatusTypeDef HAL_FLASH_Unlock(void) { return HAL_OK; }
@@ -194,8 +257,8 @@ static void tick10(unsigned n)
     }
 }
 
-/* 設定を工場出荷値にし、停止中の DISABLED にする */
-static void setup(void)
+/* 起動して、停止中の DISABLED にする（保存設定は nv_clear / nv_put で用意しておく） */
+static void boot(void)
 {
     g_calls_n = 0;
     g_calls[0] = 0;
@@ -205,8 +268,27 @@ static void setup(void)
     g_pos = 0;
     g_vm_mv = 24000;
     g_awake = false;
-    app_init();                 /* cfg = 工場出荷値（保存設定なし）、state = NO_VM */
+    g_agc = false;              /* リセット直後は Low（FR-SYS-02） */
+    g_agc_calls = g_arm_calls = 0;
+    g_lo_fault = DRV_FAULT_NONE;
+    dlog_clear();
+    app_init();                 /* 保存設定を読み込む。なければ工場出荷値。state = NO_VM */
     tick10(6);                  /* VM が安定するまで 50 ms。NO_VM → DISABLED */
+}
+
+/* 設定を工場出荷値にし、停止中の DISABLED にする */
+static void setup(void)
+{
+    nv_clear();
+    boot();
+}
+
+static void tick1(unsigned n)
+{
+    while (n--) {
+        g_now += 1u;
+        app_tick_1ms(g_now);
+    }
 }
 
 static uint8_t rd8(uint8_t reg)
@@ -255,6 +337,7 @@ static uint8_t wr32(uint8_t reg, uint32_t v)
 #define R_STATE      0x04
 #define R_CMD_RESULT 0x07
 #define R_CFG_STATUS 0x18
+#define R_FAULT      0x05
 
 static void to_enabled(void)
 {
@@ -294,6 +377,10 @@ static void test_read_fixed_and_defaults(void)
     CHECK(rd16(0x54) == 20);
     CHECK(rd16(0x56) == 0);
     CHECK(rd8(0x58) == 1);
+    CHECK(rd8(0x1E) == 0);                    /* INPUT_STATUS（J10 未使用） */
+    CHECK(rd8(0x59) == 0);                    /* J10_MODE: 0（未使用） */
+    CHECK(rd16(0x5A) == 800);                 /* HOME_SPEED */
+    CHECK(rd32(0x5C) == 0);                   /* ENC_COUNT */
 }
 
 static void test_read_little_endian_and_span(void)
@@ -386,6 +473,8 @@ static void test_write_ranges(void)
         {0x54, 2, 1, 1000, 0, 1001},
         {0x56, 2, 0, 4095, 4096, 65535},
         {0x58, 1, 0, 2, 3, 255},
+        {0x59, 1, 0, 2, 3, 255},
+        {0x5A, 2, 1, 65535, 0, 0},
     };
     for (unsigned i = 0; i < sizeof t / sizeof t[0]; i++) {
         const range_t *r = &t[i];
@@ -530,7 +619,7 @@ static void test_partial_move_commands(void)
 /* 16bit レジスタ：仕様 FR-COM-08 は 32bit だけを規定している。実装は 16bit も全バイトでなければ反映しない */
 static void test_partial_16bit_writes(void)
 {
-    static const uint8_t regs[] = {0x20, 0x22, 0x26, 0x3C, 0x3E, 0x54, 0x56};
+    static const uint8_t regs[] = {0x20, 0x22, 0x26, 0x3C, 0x3E, 0x54, 0x56, 0x5A};
     for (unsigned i = 0; i < sizeof regs; i++) {
         setup();
         uint16_t before = rd16(regs[i]);
@@ -755,6 +844,334 @@ static void test_config_status_dirty(void)
     CHECK((rd8(R_CFG_STATUS) & 0x01) == 0);
 }
 
+/* ---------------------------------------------------------------- P2：J10 のレジスタ（0x1E、0x59〜0x5F） */
+
+static void test_j10_registers(void)
+{
+    setup();
+    /* マップの末尾は 0x5F。0x5F は ENC_COUNT の最上位バイト（0）、0x60 以降は 0xFF */
+    uint8_t b[6];
+    app_reg_read(0x5F, 2, b);
+    CHECK(b[0] == 0 && b[1] == 0xFF);
+    app_reg_read(0x58, 6, b);   /* PA7_MODE、J10_MODE、HOME_SPEED(2)、ENC_COUNT の下位 2 バイト */
+    CHECK(b[0] == 1 && b[1] == 0 && b[2] == (800 & 0xFF) && b[3] == (800 >> 8) && b[4] == 0 && b[5] == 0);
+
+    /* J10_MODE：0〜2、書いた値が読める。未保存の変更ありになる */
+    CHECK(wr8(0x59, 1) == RESULT_OK);
+    CHECK(rd8(0x59) == 1);
+    CHECK((rd8(R_CFG_STATUS) & 0x02) != 0);
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    CHECK(rd8(0x59) == 2);
+    CHECK(wr8(0x59, 3) == RESULT_INVALID);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_INVALID);
+    CHECK(rd8(0x59) == 2);
+
+    /* HOME_SPEED：1〜65535、0 は反映せず 2。1 バイトだけの書き込み（部分書き込み）は拒否 */
+    CHECK(wr16(0x5A, 0x1234) == RESULT_OK);
+    CHECK(rd16(0x5A) == 0x1234);
+    CHECK(wr16(0x5A, 0) == RESULT_INVALID);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_INVALID);
+    CHECK(rd16(0x5A) == 0x1234);
+    CHECK(wr8(0x5A, 0x77) == RESULT_INVALID);
+    CHECK(wr8(0x5B, 0x77) == RESULT_INVALID);
+    CHECK(rd16(0x5A) == 0x1234);
+    /* 0x58 から 4 バイトの 1 フレーム（PA7_MODE、J10_MODE、HOME_SPEED） */
+    const uint8_t d[] = {0, 1, 0x20, 0x03};
+    CHECK(wr(0x58, d, 4) == RESULT_OK);
+    CHECK(rd8(0x58) == 0 && rd8(0x59) == 1 && rd16(0x5A) == 800);
+
+    /* INPUT_STATUS（0x1E）と ENC_COUNT（0x5C〜0x5F）は読み出し専用：書くと 2、値は 0 のまま */
+    for (uint8_t a = 0x5C; a <= 0x5F; a++) {
+        CHECK(wr8(a, 0x5A) == RESULT_INVALID);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_INVALID);
+    }
+    CHECK(wr32(0x5C, 5) == RESULT_INVALID);
+    CHECK(rd32(0x5C) == 0);
+    CHECK(wr8(0x1E, 0xFF) == RESULT_INVALID);
+    CHECK(rd8(0x1E) == 0);
+    /* 0x60 以降は書けない */
+    CHECK(wr8(0x60, 1) == RESULT_INVALID);
+    CHECK(wr(0x5E, d, 4) == RESULT_INVALID);   /* マップの内側から外側へまたがる書き込み */
+}
+
+/* J10_MODE は停止中（パルス出力なし）のみ書ける。動作中は 1（FR-J10-02）。HOME_SPEED は制限しない */
+static void test_j10_mode_only_when_stopped(void)
+{
+    to_enabled();
+    g_running = true;
+    CHECK(wr8(0x59, 1) == RESULT_REJECTED);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+    CHECK(rd8(0x59) == 0);
+    CHECK(wr16(0x5A, 1000) == RESULT_OK);
+    g_running = false;
+    g_pending = true;
+    CHECK(wr8(0x59, 2) == RESULT_REJECTED);
+    CHECK(rd8(0x59) == 0);
+    g_pending = false;
+    CHECK(wr8(0x59, 2) == RESULT_OK);   /* ENABLED でも停止中なら書ける */
+    CHECK(rd8(0x59) == 2);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_OK);
+}
+
+/* FLAGS：bit3（AGC）・bit4（HOME 論理）は書ける。bit5〜7 は 2 */
+static void test_flags_agc_home_bits(void)
+{
+    setup();
+    for (uint8_t f = 0; f <= 0x1Fu; f++) {
+        CHECK(wr8(0x25, f) == RESULT_OK);
+        CHECK(rd8(0x25) == f);
+    }
+    CHECK(wr8(0x25, 0x1B) == RESULT_OK);
+    CHECK(wr8(0x25, 0x38) == RESULT_INVALID);
+    CHECK(wr8(0x25, 0x98) == RESULT_INVALID);
+    CHECK(wr8(0x25, 0xFF) == RESULT_INVALID);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_INVALID);
+    CHECK(rd8(0x25) == 0x1B);
+}
+
+/* ---------------------------------------------------------------- P2：AGC（FR-AGC-01〜06） */
+
+/* DISABLED 中に bit3 を書くと即時に端子へ（両方同じレベル）。bit3 以外の変更では端子レベルを変えない */
+static void test_agc_write_disabled(void)
+{
+    setup();
+    CHECK(!g_agc);                       /* 既定は OFF（Low） */
+    dlog_clear();
+    CHECK(wr8(0x25, 0x0A) == RESULT_OK);
+    CHECK(g_agc);
+    CHECK(rd8(0x25) == 0x0A);
+    CHECK(g_dlog[0] == 'A' && strchr(g_dlog, 'a') == NULL);   /* 起床中の DMODE 書き換え（W）が続いてもよい */
+    CHECK(wr8(0x25, 0x0B) == RESULT_OK); /* bit3 は変えない */
+    CHECK(g_agc);
+    CHECK(wr8(0x25, 0x02) == RESULT_OK);
+    CHECK(!g_agc);
+    CHECK(rd8(0x25) == 0x02);
+    CHECK(wr8(0x25, 0x1A) == RESULT_OK); /* bit4 も立てた状態で ON */
+    CHECK(g_agc);
+}
+
+/* NO_VM・FAULT 中の書き込みも即時 */
+static void test_agc_write_no_vm_and_fault(void)
+{
+    nv_clear();
+    g_vm_mv = 24000;
+    g_awake = false;
+    app_init();                          /* tick しない: NO_VM のまま */
+    CHECK(rd8(R_STATE) == APP_NO_VM);
+    CHECK(wr8(0x25, 0x0A) == RESULT_OK);
+    CHECK(g_agc);
+    CHECK(wr8(0x25, 0x02) == RESULT_OK);
+    CHECK(!g_agc);
+
+    setup();
+    CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+    app_on_driver_fault_isr(DRV_FAULT_ISD);
+    tick1(1);
+    CHECK(rd8(R_STATE) == APP_FAULT);
+    CHECK(wr8(0x25, 0x0A) == RESULT_OK);
+    CHECK(g_agc);
+    CHECK(wr8(0x25, 0x02) == RESULT_OK);
+    CHECK(!g_agc);
+}
+
+/* ENABLED 中に bit3 を変える書き込みは FLAGS 全体を反映せず 1。端子も設定も変わらない */
+static void test_agc_write_enabled_rejected(void)
+{
+    for (int on = 0; on <= 1; on++) {
+        setup();
+        CHECK(wr8(0x25, on ? 0x0A : 0x02) == RESULT_OK);
+        CHECK(g_agc == (on != 0));
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        uint8_t keep = rd8(0x25);
+        unsigned calls = g_agc_calls;
+        uint8_t st = rd8(R_CFG_STATUS);
+        /* bit3 だけ反転、bit3 と bit0 を同時に変更（bit0 も反映されないこと） */
+        CHECK(wr8(0x25, (uint8_t)(keep ^ 0x08)) == RESULT_REJECTED);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+        CHECK(rd8(0x25) == keep);
+        CHECK(wr8(0x25, (uint8_t)(keep ^ 0x09)) == RESULT_REJECTED);
+        CHECK(rd8(0x25) == keep);
+        CHECK(g_agc == (on != 0));
+        CHECK(g_agc_calls == calls);
+        CHECK(rd8(R_CFG_STATUS) == st);
+        /* bit3 を変えない FLAGS の書き込みは受け付け、端子には触れない */
+        CHECK(wr8(0x25, (uint8_t)(keep ^ 0x01)) == RESULT_OK);
+        CHECK(rd8(0x25) == (uint8_t)(keep ^ 0x01));
+        CHECK(g_agc == (on != 0));
+        CHECK(g_agc_calls == calls);
+        /* 励磁 OFF になれば書ける */
+        CHECK(wr8(0x50, CMD_DISABLE) == RESULT_OK);
+        CHECK(wr8(0x25, (uint8_t)(keep ^ 0x08)) == RESULT_OK);
+        CHECK(g_agc == (on == 0));
+    }
+}
+
+/* ENABLED 中の FACTORY：RAM の設定は変わるが端子は変えず、DISABLE（EN=Low）／FAULT で反映する */
+static void test_agc_factory_while_enabled(void)
+{
+    setup();
+    CHECK(wr8(0x25, 0x0A) == RESULT_OK);   /* AGC ON（DISABLED 中なので即時） */
+    CHECK(g_agc);
+    CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+    dlog_clear();
+    CHECK(wr8(0x50, CMD_FACTORY_SETTINGS) == RESULT_OK);   /* 励磁したままの停止で受け付ける */
+    CHECK(rd8(0x25) == 0x02);              /* 設定は工場出荷値（AGC OFF）になる */
+    CHECK(g_agc);                          /* 端子は変えない */
+    CHECK(strchr(g_dlog, 'a') == NULL && strchr(g_dlog, 'A') == NULL);
+    CHECK(rd8(R_STATE) == APP_ENABLED);
+
+    dlog_clear();
+    CHECK(wr8(0x50, CMD_DISABLE) == RESULT_OK);
+    CHECK(!g_agc);                         /* EN=Low になったときに反映 */
+    CHECK(strcmp(g_dlog, "Da") == 0);      /* 励磁 OFF の後に AGC を変える */
+
+    /* FAULT への遷移で反映（LO 割り込みは EN=Low にするだけで、main 側の enter_fault で反映） */
+    setup();
+    CHECK(wr8(0x25, 0x0A) == RESULT_OK);
+    CHECK(g_agc);
+    CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+    CHECK(wr8(0x50, CMD_FACTORY_SETTINGS) == RESULT_OK);
+    CHECK(g_agc);
+    app_on_driver_fault_isr(DRV_FAULT_OPD);
+    CHECK(g_agc);
+    tick1(1);
+    CHECK(rd8(R_STATE) == APP_FAULT);
+    CHECK(!g_agc);
+}
+
+/* ENABLED 中の LOAD：RAM の設定は保存値の AGC になるが、端子は DISABLE で反映 */
+static void test_agc_load_while_enabled(void)
+{
+    for (int saved = 0; saved <= 1; saved++) {
+        nv_clear();
+        settings_t t;
+        settings_defaults(&t);
+        t.flags = saved ? 0x0A : 0x02;
+        nv_put(&t);
+        boot();
+        CHECK((rd8(R_CFG_STATUS) & 0x01) != 0);   /* 起動時に保存設定を読み込んだ */
+        CHECK(g_agc == (saved != 0));
+        CHECK(wr8(0x25, saved ? 0x02 : 0x0A) == RESULT_OK);   /* DISABLED 中に反対にする（即時） */
+        CHECK(g_agc == (saved == 0));
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        dlog_clear();
+        CHECK(wr8(0x50, CMD_LOAD_SETTINGS) == RESULT_OK);
+        CHECK(rd8(0x25) == (saved ? 0x0A : 0x02));
+        CHECK(g_agc == (saved == 0));                    /* 端子は変えない */
+        CHECK(strchr(g_dlog, 'a') == NULL && strchr(g_dlog, 'A') == NULL);
+        CHECK(wr8(0x50, CMD_DISABLE) == RESULT_OK);
+        CHECK(g_agc == (saved != 0));
+    }
+    /* DISABLED 中の LOAD は即時 */
+    nv_clear();
+    settings_t t;
+    settings_defaults(&t);
+    t.flags = 0x0A;
+    nv_put(&t);
+    boot();
+    CHECK(wr8(0x25, 0x02) == RESULT_OK);
+    CHECK(!g_agc);
+    CHECK(wr8(0x50, CMD_LOAD_SETTINGS) == RESULT_OK);
+    CHECK(g_agc);
+}
+
+/* 起動・スタンバイ解除：drv_wake より前に保存値の AGC を端子へ出す（FR-AGC-03） */
+static void test_agc_before_wake(void)
+{
+    for (int saved = 0; saved <= 1; saved++) {
+        nv_clear();
+        settings_t t;
+        settings_defaults(&t);
+        t.flags = saved ? 0x0A : 0x02;
+        nv_put(&t);
+        boot();
+        CHECK(rd8(R_STATE) == APP_DISABLED);
+        CHECK(g_agc == (saved != 0));
+        CHECK(strcmp(g_dlog, saved ? "AW" : "aW") == 0);   /* 設定読み込み → AGC → 起床 */
+
+        /* VM 喪失：EN=Low の後、スタンバイの前に AGC を出す。復帰で再び AGC → 起床 */
+        dlog_clear();
+        g_vm_mv = 0;
+        tick10(3);
+        CHECK(rd8(R_STATE) == APP_NO_VM);
+        CHECK(strcmp(g_dlog, saved ? "DAZ" : "DaZ") == 0);
+        dlog_clear();
+        g_vm_mv = 24000;
+        tick10(6);
+        CHECK(rd8(R_STATE) == APP_DISABLED);
+        CHECK(strcmp(g_dlog, saved ? "AW" : "aW") == 0);
+
+        /* FAULT → CLEAR_FAULT のスタンバイ解除 */
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        app_on_driver_fault_isr(DRV_FAULT_TSD);
+        tick1(1);
+        CHECK(rd8(R_STATE) == APP_FAULT);
+        dlog_clear();
+        CHECK(wr8(0x50, CMD_CLEAR_FAULT) == RESULT_OK);
+        CHECK(strcmp(g_dlog, saved ? "AW" : "aW") == 0);
+        CHECK(g_agc == (saved != 0));
+    }
+    /* 保存設定なし：OFF で起動 */
+    setup();
+    CHECK(!g_agc);
+    CHECK(strcmp(g_dlog, "aW") == 0);
+}
+
+/* setup() の後、前のテストが残した FAULT レジスタ（app_init は消さない）を 0 にして DISABLED に戻す */
+static void setup_clean_fault(void)
+{
+    setup();
+    if (rd8(R_FAULT) != 0) {
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        app_on_driver_fault_isr(DRV_FAULT_TSD);
+        tick1(1);
+        CHECK(wr8(0x50, CMD_CLEAR_FAULT) == RESULT_OK);
+    }
+    CHECK(rd8(R_FAULT) == 0);
+    CHECK(rd8(R_STATE) == APP_DISABLED);
+}
+
+/* AGC の ON/OFF で LO 異常の検出・保護の動作は変わらない（FR-AGC-06） */
+static void test_agc_does_not_change_fault_handling(void)
+{
+    for (int on = 0; on <= 1; on++) {
+        /* LO 割り込み（ISD）→ FAULT、パルス即停止 */
+        setup_clean_fault();
+        CHECK(wr8(0x25, on ? 0x0A : 0x02) == RESULT_OK);
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        unsigned arm = g_arm_calls;
+        CHECK(wr8(0x25, on ? 0x0B : 0x03) == RESULT_OK);   /* FLAGS の書き込みは LO 割り込みの許可に触れない */
+        CHECK(g_arm_calls == arm);
+        g_calls_n = 0;
+        g_calls[0] = 0;
+        app_on_driver_fault_isr(DRV_FAULT_ISD);
+        tick1(1);
+        CHECK(rd8(R_STATE) == APP_FAULT);
+        CHECK(rd8(R_FAULT) == DRV_FAULT_ISD);
+        CHECK(strchr(g_calls, 'E') != NULL);
+
+        /* LO のポーリング（割り込みの取りこぼし）→ OPD */
+        setup_clean_fault();
+        CHECK(wr8(0x25, on ? 0x0A : 0x02) == RESULT_OK);
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        tick1(8);                                          /* LO_ARM_DELAY_MS 後にアーム */
+        CHECK(rd8(R_STATE) == APP_ENABLED);
+        g_lo_fault = DRV_FAULT_OPD;
+        tick1(1);
+        CHECK(rd8(R_STATE) == APP_FAULT);
+        CHECK(rd8(R_FAULT) == DRV_FAULT_OPD);
+        g_lo_fault = DRV_FAULT_NONE;
+
+        /* LO 異常がなければ AGC ON でも ENABLED のまま */
+        setup_clean_fault();
+        CHECK(wr8(0x25, on ? 0x0A : 0x02) == RESULT_OK);
+        CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+        tick1(20);
+        CHECK(rd8(R_STATE) == APP_ENABLED);
+        CHECK(rd8(R_FAULT) == 0);
+    }
+}
+
 int main(void)
 {
     printf("test_app: app.c register tests\n");
@@ -775,6 +1192,16 @@ int main(void)
     RUN(test_broadcast_command);
     RUN(test_read_snapshot);
     RUN(test_config_status_dirty);
+    RUN(test_j10_registers);
+    RUN(test_j10_mode_only_when_stopped);
+    RUN(test_flags_agc_home_bits);
+    RUN(test_agc_write_disabled);
+    RUN(test_agc_write_no_vm_and_fault);
+    RUN(test_agc_write_enabled_rejected);
+    RUN(test_agc_factory_while_enabled);
+    RUN(test_agc_load_while_enabled);
+    RUN(test_agc_before_wake);
+    RUN(test_agc_does_not_change_fault_handling);
 
     printf("%d checks, %d failed\n", g_checks, g_fail);
     return g_fail ? 1 : 0;
