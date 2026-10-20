@@ -138,6 +138,86 @@ extern DWT_TypeDef g_dwt;
 #define DWT (&g_dwt)
 extern uint32_t SystemCoreClock;
 
+/* ---- CAN1（comm.c）。実体は test_comm.c（送信メールボックス・受信 FIFO を模擬する） ---- */
+#define ENABLE   1u
+#define DISABLE  0u
+
+typedef struct {
+    uint32_t ESR;
+} CAN_TypeDef;
+
+extern CAN_TypeDef g_can1;
+#define CAN1 (&g_can1)
+#define CAN_ESR_EPVF  (1u << 1)
+#define CAN_ESR_BOFF  (1u << 2)
+#define __HAL_RCC_CAN1_CLK_ENABLE()  ((void)0)
+#define CAN1_RX0_IRQn  20
+#define CAN1_SCE_IRQn  22
+
+#define CAN_MODE_NORMAL        0u
+#define CAN_SJW_1TQ            0u
+#define CAN_BS1_13TQ           12u
+#define CAN_BS2_2TQ            1u
+#define CAN_ID_STD             0u
+#define CAN_ID_EXT             4u
+#define CAN_RTR_DATA           0u
+#define CAN_RTR_REMOTE         2u
+#define CAN_RX_FIFO0           0u
+#define CAN_FILTERMODE_IDMASK  0u
+#define CAN_FILTERSCALE_16BIT  0u
+#define CAN_FILTER_FIFO0       0u
+#define CAN_IT_RX_FIFO0_MSG_PENDING  (1u << 1)
+#define CAN_IT_RX_FIFO0_OVERRUN      (1u << 3)
+#define CAN_IT_ERROR_PASSIVE         (1u << 5)
+#define CAN_IT_BUSOFF                (1u << 6)
+#define CAN_IT_ERROR                 (1u << 15)
+#define HAL_CAN_ERROR_NONE     0u
+#define HAL_CAN_ERROR_EPV      (1u << 1)
+#define HAL_CAN_ERROR_BOF      (1u << 2)
+#define HAL_CAN_ERROR_RX_FOV0  (1u << 9)
+
+typedef struct {
+    uint32_t Prescaler, Mode, SyncJumpWidth, TimeSeg1, TimeSeg2;
+    uint32_t TimeTriggeredMode, AutoBusOff, AutoWakeUp, AutoRetransmission;
+    uint32_t ReceiveFifoLocked, TransmitFifoPriority;
+} CAN_InitTypeDef;
+
+typedef struct {
+    CAN_TypeDef *Instance;
+    CAN_InitTypeDef Init;
+    uint32_t ErrorCode;
+} CAN_HandleTypeDef;
+
+typedef struct {
+    uint32_t FilterIdHigh, FilterIdLow, FilterMaskIdHigh, FilterMaskIdLow;
+    uint32_t FilterFIFOAssignment, FilterBank, FilterMode, FilterScale;
+    uint32_t FilterActivation, SlaveStartFilterBank;
+} CAN_FilterTypeDef;
+
+typedef struct {
+    uint32_t StdId, ExtId, IDE, RTR, DLC, TransmitGlobalTime;
+} CAN_TxHeaderTypeDef;
+
+typedef struct {
+    uint32_t StdId, ExtId, IDE, RTR, DLC, Timestamp, FilterMatchIndex;
+} CAN_RxHeaderTypeDef;
+
+uint32_t HAL_GetTick(void);
+HAL_StatusTypeDef HAL_CAN_Init(CAN_HandleTypeDef *h);
+HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef *h, CAN_FilterTypeDef *f);
+HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef *h, uint32_t it);
+HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef *h);
+uint32_t HAL_CAN_GetTxMailboxesFreeLevel(CAN_HandleTypeDef *h);
+HAL_StatusTypeDef HAL_CAN_AddTxMessage(CAN_HandleTypeDef *h, CAN_TxHeaderTypeDef *hd,
+                                       const uint8_t *data, uint32_t *mailbox);
+uint32_t HAL_CAN_GetRxFifoFillLevel(CAN_HandleTypeDef *h, uint32_t fifo);
+HAL_StatusTypeDef HAL_CAN_GetRxMessage(CAN_HandleTypeDef *h, uint32_t fifo,
+                                       CAN_RxHeaderTypeDef *hd, uint8_t *data);
+uint32_t HAL_CAN_GetError(CAN_HandleTypeDef *h);
+void HAL_CAN_IRQHandler(CAN_HandleTypeDef *h);
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *h);
+void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *h);
+
 /* ---- Flash（settings.c）。実体は test_settings.c（RAM 上の配列で模擬する） ---- */
 typedef struct {
     uint32_t ECCR;

@@ -3,6 +3,8 @@
 #   test_position : position.c の計算関数
 #   test_stepper  : stepper.c の台形加減速（test_stepper.c が stepper.c を #include する）
 #   test_settings : settings.c（不揮発設定。Flash は RAM 上の配列で模擬し、読み出しは -DNV_BASE -DNV_MEMCPY で差し替える）
+#   test_comm     : comm.c（CAN 通信層。app の関数は test_comm.c 内の偽物、HAL の CAN はスタブ）
+#   test_app      : app.c のレジスタ処理（app_reg_read / app_reg_write。settings.c は実物、stepper・drv などは test_app.c 内の偽物）
 # 必要なもの: gcc（MinGW-w64 / MSYS2 / Linux の gcc など。GNU 拡張のインラインアセンブラを使うため gcc 系）。
 # FW 本体の ARM ビルド（firmware/CMakeLists.txt）とは独立。成果物は build/ に出る。
 # どれかが失敗したら非 0 で終わる。
@@ -45,8 +47,20 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     -o "$out\test_settings.exe"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# comm.c
+& $cc @common @inc `
+    "$here\test_comm.c" "$here\stubs_hw.c" "$app\Src\comm.c" `
+    -o "$out\test_comm.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# app.c（レジスタ処理。settings.c は実物。-fshort-enums は app.c の SYM_ENTRY(state) が 1 バイトを要求するため）
+& $cc @common '-DNV_BASE=0x0803F000u' '-DNV_MEMCPY=test_nv_memcpy' @inc '-fshort-enums' `
+    "$here\test_app.c" "$here\stubs_hw.c" "$app\Src\app.c" "$app\Src\settings.c" `
+    -o "$out\test_app.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $rc = 0
-foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings') {
+foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings', 'test_comm', 'test_app') {
     Write-Host "=== $t"
     & "$out\$t.exe"
     if ($LASTEXITCODE -ne 0) { $rc = $LASTEXITCODE }

@@ -6,7 +6,7 @@
 #include "usb_proto.h"
 #include <string.h>
 
-#define RX_RING_LEN  16u   /* 2 のべき乗でなくてよい。main が停止中（Flash 消去 約 25 ms）の取りこぼし対策 */
+#define RX_RING_LEN  17u   /* 16 件保持（満杯判定のため 1 スロット空ける）。2 のべき乗でなくてよい。main が停止中（Flash 消去 約 25 ms）の取りこぼし対策 */
 
 typedef struct {
     uint16_t id;
