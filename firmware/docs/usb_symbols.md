@@ -127,7 +127,7 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `usb_stats.rx_timeouts` | u32 | フレーム途中で 20 ms 途切れて捨てた数 |
 | `usb_stats.bad_len` | u32 | LEN が範囲外で SOF を探し直した回数 |
 | `usb_stats.tx_frames` | u32 | 送信を USB ミドルウェアへ渡したフレーム数 |
-| `usb_stats.tx_dropped` | u32 | 50 ms 送信できず捨てた応答・イベント数 |
+| `usb_stats.tx_dropped` | u32 | 50 ms 送信できず捨てた応答・イベント数。送信が詰まって応答を送れないため実行せず捨てた要求、未送信のまま新しいイベントで上書きされたイベントも含む |
 
 ## 登録の追加方法
 

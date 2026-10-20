@@ -61,16 +61,22 @@ bool usb_mem_allowed(uint32_t addr, uint32_t size)
     return false;
 }
 
+/* ホスト単体テスト（tests/host）は実アドレスを読めないため、-D で差し替える。実機では直接読む */
+#ifndef USB_MEM_RD8
+#define USB_MEM_RD8(a)   (*(volatile const uint8_t *)(uintptr_t)(a))
+#define USB_MEM_RD32(a)  (*(volatile const uint32_t *)(uintptr_t)(a))
+#endif
+
 /* 4 バイト境界に揃った部分は 32bit 単位、端は 8bit で読む（FR-USB-32） */
 static void mem_copy(uint8_t *dst, uint32_t addr, uint32_t n)
 {
     while (n > 0u && (addr & 3u) != 0u) {
-        *dst++ = *(volatile const uint8_t *)(uintptr_t)addr;
+        *dst++ = USB_MEM_RD8(addr);
         addr++;
         n--;
     }
     while (n >= 4u) {
-        uint32_t w = *(volatile const uint32_t *)(uintptr_t)addr;
+        uint32_t w = USB_MEM_RD32(addr);
         dst[0] = (uint8_t)w;
         dst[1] = (uint8_t)(w >> 8);
         dst[2] = (uint8_t)(w >> 16);
@@ -80,7 +86,7 @@ static void mem_copy(uint8_t *dst, uint32_t addr, uint32_t n)
         n -= 4u;
     }
     while (n > 0u) {
-        *dst++ = *(volatile const uint8_t *)(uintptr_t)addr;
+        *dst++ = USB_MEM_RD8(addr);
         addr++;
         n--;
     }
@@ -305,6 +311,9 @@ void usb_proto_notify_can_frame(const comm_frame_t *f)
 {
     if (!session) {
         return;
+    }
+    if (pending_event) {
+        tx_drop();   /* 未送信のイベントを新しいイベントで上書きする */
     }
     event_frame = *f;
     event_t0 = HAL_GetTick();
@@ -555,7 +564,7 @@ static uint8_t exec_command(const uint8_t *req, uint8_t len, uint8_t *out, uint8
 
 /* ---------------------------------------------------------------- メインループ */
 
-/* 受信済みの 1 フレームを実行して応答を作る。送信スロットが空いていれば応答を積み、なければ破棄する */
+/* 受信済みの 1 フレームを実行して応答を積む。送信スロットが空いているときだけ呼ぶ（応答を送れない要求は実行しない） */
 static void handle_frame(uint32_t now)
 {
     const uint8_t *req = &frame[1];
@@ -572,11 +581,7 @@ static void handle_frame(uint32_t now)
         dlen = 0;
     }
 
-    if (tx_state == TX_FREE) {
-        tx_queue(rsp, (uint8_t)(3u + dlen), now);
-    } else {
-        tx_drop();   /* 50 ms 以上塞がっている（ホストが読み出さない）ので応答は捨てる */
-    }
+    tx_queue(rsp, (uint8_t)(3u + dlen), now);
 }
 
 static void send_pending_event(uint32_t now)
@@ -622,7 +627,12 @@ void usb_proto_poll(void)
     tx_service(now);
 
     rx_parse();
-    if (frame_ready && (tx_state == TX_FREE || tx_stuck(now))) {
+    if (frame_ready && tx_stuck(now)) {
+        /* 50 ms 以上塞がっている（ホストが読み出さない）。応答を送れないので要求は実行せず捨てる。PC は再送する */
+        frame_ready = false;
+        tx_drop();
+        rx_parse();
+    } else if (frame_ready && tx_state == TX_FREE) {
         handle_frame(now);
         frame_ready = false;
         tx_service(now);   /* 受信完了から 10 ms 以内に送信を始める（FR-USB-06） */

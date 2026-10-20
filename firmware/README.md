@@ -38,8 +38,9 @@ STM32L433CCU6 + TB67S249FTG。開発環境は STM32CubeMX ＋ VS Code（ST 公�
 - build-id：リンクオプション `-Wl,--build-id=sha1` と、`App/STM32L433xx_app.ld` の `.note.gnu.build-id`（Flash に配置、`KEEP`）。EXCHANGE_ID（0x17）が SHA1 20 バイトを返すので、PC は ELF の build-id（`arm-none-eabi-readelf -n driver_fw.elf`）と一致を確認してからアドレス指定読み出しに使う
 - 名前表：`App/Inc/symtab.h` の `SYM_ENTRY(変数, SYM_U32, 要素数);` 1 行で登録する。エントリは `.sym_table` セクションに置かれ、リンカスクリプトが連結する。static 変数も、その変数を定義した .c の末尾で登録できる。INDEX はリンク順で決まり版ごとに変わるので、PC は SYM_FIND で名前から引く。登録一覧は [docs/usb_symbols.md](docs/usb_symbols.md)
 - 統計（`usb_stats`）：受信フレーム数・CRC エラー数・破棄数など。名前表から読める
-- 送信は 50 ms 続けて送れなかった応答・イベントを破棄する（ホストが COM ポートを開いていないときもメインループを止めない）
+- 送信は 50 ms 続けて送れなかった応答・イベントを破棄する（ホストが COM ポートを開いていないときもメインループを止めない）。送信が 50 ms 以上詰まって応答を送れないときに受けた要求は実行せず捨てる（`tx_dropped` に計上。PC はタイムアウトで再送する）。未送信のイベントを新しいイベントで上書きしたときも `tx_dropped` に 1 計上する
 - 書き込み（DNLOAD 相当）、USB↔CAN バスのブリッジ、VBUS 検出は実装していない
+- ホスト単体テスト：`tests/host/` で `usb_proto.c`・`symtab.c` を実物のままホスト PC の gcc でビルドして試験する（FW 本体の ARM ビルドとは別）。実行は `powershell -File tests/host/run_tests.ps1`（Windows）または `sh tests/host/run_tests.sh`。gcc が PATH に必要（`CC` 環境変数で変更可）。`usb_proto.c` のメモリ読み出しだけ `USB_MEM_RD8` / `USB_MEM_RD32` マクロでテスト時に差し替える
 
 ## 使い方
 
