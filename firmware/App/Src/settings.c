@@ -6,8 +6,12 @@
 #include <stddef.h>
 #include <string.h>
 
-/* リンカスクリプト STM32L433xx_app.ld で FLASH を 252K にして確保した領域 */
+/* リンカスクリプト STM32L433xx_app.ld で FLASH を 252K にして確保した領域。
+ * ホスト単体テスト（tests/host）は実アドレスを読めないため、-D で NV_BASE と NV_MEMCPY を差し替える。実機では直接読む */
+#ifndef NV_BASE
 #define NV_BASE        0x0803F000u
+#define NV_MEMCPY(dst, addr, n)  memcpy((dst), (const void *)(uintptr_t)(addr), (n))
+#endif
 #define NV_FIRST_PAGE  126u
 #define NV_PAGES       2u
 #define REC_SIZE       64u
@@ -142,7 +146,7 @@ typedef enum { SLOT_BLANK, SLOT_VALID, SLOT_USED } slot_state_t;
 static slot_state_t read_slot(uint32_t addr, record_t *r)
 {
     nv_ecc_error = false;
-    memcpy(r, (const void *)addr, sizeof *r);
+    NV_MEMCPY(r, addr, sizeof *r);
     if (nv_ecc_error) {
         return SLOT_USED;
     }

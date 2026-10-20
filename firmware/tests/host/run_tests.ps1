@@ -2,6 +2,7 @@
 #   test_usb      : usb_proto.c / symtab.c
 #   test_position : position.c の計算関数
 #   test_stepper  : stepper.c の台形加減速（test_stepper.c が stepper.c を #include する）
+#   test_settings : settings.c（不揮発設定。Flash は RAM 上の配列で模擬し、読み出しは -DNV_BASE -DNV_MEMCPY で差し替える）
 # 必要なもの: gcc（MinGW-w64 / MSYS2 / Linux の gcc など。GNU 拡張のインラインアセンブラを使うため gcc 系）。
 # FW 本体の ARM ビルド（firmware/CMakeLists.txt）とは独立。成果物は build/ に出る。
 # どれかが失敗したら非 0 で終わる。
@@ -38,8 +39,14 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     -lm -o "$out\test_stepper.exe"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# settings.c
+& $cc @common '-DNV_BASE=0x0803F000u' '-DNV_MEMCPY=test_nv_memcpy' @inc `
+    "$here\test_settings.c" "$app\Src\settings.c" `
+    -o "$out\test_settings.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $rc = 0
-foreach ($t in 'test_usb', 'test_position', 'test_stepper') {
+foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings') {
     Write-Host "=== $t"
     & "$out\$t.exe"
     if ($LASTEXITCODE -ne 0) { $rc = $LASTEXITCODE }

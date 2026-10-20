@@ -138,4 +138,30 @@ extern DWT_TypeDef g_dwt;
 #define DWT (&g_dwt)
 extern uint32_t SystemCoreClock;
 
+/* ---- Flash（settings.c）。実体は test_settings.c（RAM 上の配列で模擬する） ---- */
+typedef struct {
+    uint32_t ECCR;
+} FLASH_TypeDef;
+
+extern FLASH_TypeDef g_flash_regs;
+#define FLASH (&g_flash_regs)
+#define FLASH_ECCR_ECCD  (1u << 31)
+
+#define FLASH_PAGE_SIZE               2048u
+#define FLASH_TYPEERASE_PAGES         0u
+#define FLASH_BANK_1                  1u
+#define FLASH_TYPEPROGRAM_DOUBLEWORD  0u
+#define FLASH_FLAG_ALL_ERRORS         0x0000C3FAu
+#define __HAL_FLASH_CLEAR_FLAG(f)     ((void)(f))
+
+typedef struct {
+    uint32_t TypeErase, Banks, Page, NbPages;
+} FLASH_EraseInitTypeDef;
+
+void test_nv_memcpy(void *dst, uint32_t addr, uint32_t n);   /* settings.c の Flash 読み出し（NV_MEMCPY）の差し替え先 */
+HAL_StatusTypeDef HAL_FLASH_Unlock(void);
+HAL_StatusTypeDef HAL_FLASH_Lock(void);
+HAL_StatusTypeDef HAL_FLASH_Program(uint32_t type, uint32_t address, uint64_t data);
+HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *init, uint32_t *page_error);
+
 #endif /* STM32L4XX_HAL_H */
