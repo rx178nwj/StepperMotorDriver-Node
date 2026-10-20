@@ -5,7 +5,9 @@
 | 対象基板 | SteppingMotorDriver_NEMA23（`schematic/schematic.kicad_sch` 2026-10-11 版） |
 | MCU | STM32L433CCU6（UFQFPN48、Flash 256KB / SRAM 64KB）＝回路図参照 IC2 |
 | モータドライバ | TB67S249FTG＝回路図参照 IC1 |
-| 版 | 0.12（2026-10-20：CAN 要求の細部（FR-COM-07・08・11）、STEPS_PER_REV の範囲、保存値の丸め先（FR-NV-05）を明記） |
+| 版 | 0.13（2026-10-20：原点・リミットの細部（FR-HOME-03〜06）を明記） |
+
+**0.13 での変更**：J10 の原点・リミット（E3・E4）の実装で決めた細部を明記した。(1) FR-HOME-03：原点復帰中はリミット停止を行わず、停止は原点復帰の手順（FR-HOME-05・06）に従う（INPUT_STATUS bit5 も立てない）。(2) FR-HOME-04：INPUT_STATUS bit5 は、受け付けた MOVE_ABS・MOVE_REL・RUN_SPEED（0 以外）・ジョグ、および原点復帰の開始で 0 にする。(3) FR-HOME-05：開始時に両側の入力が作動していれば、動かさずに失敗とする。(4) FR-HOME-06：原点復帰中の MOVE_ABS・MOVE_REL・RUN_SPEED（0 以外）・ジョグは CMD_RESULT=1 で拒否し、RUN_SPEED=0 は減速停止として原点復帰を中止する。(1) で反対側が中止の原因になるのは、開始後に新たに作動した場合だけとする（開始時から作動していれば、そこから離れる方向へ探索する）。(3) の途中で反対側が作動した場合と、指令によらずパルスが止まった場合も失敗とする。bit3（原点確定済み）は次の原点復帰の開始まで保持する。
 
 **0.12 での変更**：ホスト単体テスト（フェーズ C1・C2）で確認した実装の動作を仕様に明記し、受信リングを仕様どおりにした。(1) FR-COM-07：DLC 0・1 で REG を含まない不正な要求には REG=0 として `[0xFF][0x00][2]` を返す。(2) FR-COM-08：16bit レジスタも、2 バイトとも 1 フレームで書いた場合だけ反映する（部分書き込みは反映せず CMD_RESULT=2）。(3) FR-COM-11：受信リングは 16 件を保持する（FW の保持数が 15 件だったのを 16 件に修正）。あふれた場合は新しいフレームを捨てて統計 rx_dropped に計上し、リングにあるフレームは到着順に処理する。(4) 3.8 節：STEPS_PER_REV の範囲を 1〜65535 とする。(5) FR-NV-05：保存値の丸め先を明記した（数値は範囲の端、分割は 16、PA7_MODE は 1、FLAGS の未定義ビットは 0）。
 
@@ -481,10 +483,10 @@ HOME1（PA15）を ＋ 側（POSITION が増える方向）、HOME2（PA1）を 
 |---|---|
 | FR-HOME-01 | PA15・PA1 を GPIO 入力（内部プルアップ）に設定する。作動の論理は FLAGS bit4（0=アクティブ Low：NO 接点・オープンコレクタ向け、既定。1=アクティブ High）で両入力共通に決める |
 | FR-HOME-02 | 入力は 1 ms 周期で読み、2 回連続で同じレベルなら確定する（確定まで最大約 2 ms）。確定した作動状態を INPUT_STATUS bit0（HOME1）・bit1（HOME2）に出す |
-| FR-HOME-03 | リミット停止：パルス出力中に、進行方向側の入力（＋ 方向なら HOME1、− 方向なら HOME2）が作動したら、パルスを即停止する（ESTOP と同じ。励磁は維持）。INPUT_STATUS bit5 を 1 にする。FAULT にはしない。入力の確定から停止までを 1 ms 以内とする。「進行方向」は、パルス出力中の POSITION の増減方向で判定する（FLAGS bit0 の方向反転とは無関係） |
-| FR-HOME-04 | 作動しているリミット側への移動指令（MOVE_ABS・MOVE_REL・RUN_SPEED・ジョグ）は受け付けず CMD_RESULT=1 とする（ジョグは動かさない）。反対側への移動は受け付ける。MOVE_ABS の方向は目標位置と現在位置の差で決める。次に受け付けた移動指令で INPUT_STATUS bit5 を 0 にする |
-| FR-HOME-05 | 原点復帰：COMMAND 11 HOME_NEG（HOME2 側）、12 HOME_POS（HOME1 側）。ENABLED・停止中・J10_MODE=2 のときだけ受け付け、それ以外は CMD_RESULT=1。手順は (1) 指定側へ HOME_SPEED（加速度 ACCEL）で移動する。開始時にすでに指定側が作動していれば (3) から始める。(2) 指定側の入力が作動したらパルスを即停止する。(3) 反対方向へ START_SPEED（HOME_SPEED を超える場合は HOME_SPEED）で、入力が非作動になるまで移動し、非作動の確定で即停止する。(4) POSITION を 0 にし、INPUT_STATUS bit3（原点確定済み）を 1 にする |
-| FR-HOME-06 | 原点復帰中は INPUT_STATUS bit2 を 1、STATUS bit0（MOVING）を 1 にする。STOP・ESTOP・DISABLE・通信タイムアウト（FR-MON-09）・FAULT で中止し、bit2 を 0、bit4（失敗）を 1 にする。(1) の途中で反対側の入力が作動した場合（スイッチの取り違え）、および (3) で START_SPEED により 1 回転分（STEPS_PER_REV × MICROSTEP ステップ）動いても非作動にならない場合も、即停止して失敗とする。新しい原点復帰を始めると bit3・bit4 を 0 にする |
+| FR-HOME-03 | リミット停止：パルス出力中に、進行方向側の入力（＋ 方向なら HOME1、− 方向なら HOME2）が作動したら、パルスを即停止する（ESTOP と同じ。励磁は維持）。INPUT_STATUS bit5 を 1 にする。FAULT にはしない。入力の確定から停止までを 1 ms 以内とする。「進行方向」は、パルス出力中の POSITION の増減方向で判定する（FLAGS bit0 の方向反転とは無関係）。原点復帰中はこのリミット停止を行わず、停止は原点復帰の手順（FR-HOME-05・06）に従う（bit5 も立てない） |
+| FR-HOME-04 | 作動しているリミット側への移動指令（MOVE_ABS・MOVE_REL・RUN_SPEED・ジョグ）は受け付けず CMD_RESULT=1 とする（ジョグは動かさない）。反対側への移動は受け付ける。MOVE_ABS の方向は目標位置と現在位置の差で決める。INPUT_STATUS bit5 は、次に受け付けた移動指令（MOVE_ABS・MOVE_REL・RUN_SPEED（0 以外）・ジョグ）または原点復帰の開始で 0 にする |
+| FR-HOME-05 | 原点復帰：COMMAND 11 HOME_NEG（HOME2 側）、12 HOME_POS（HOME1 側）。ENABLED・停止中・J10_MODE=2 のときだけ受け付け、それ以外は CMD_RESULT=1。開始時に両側の入力が作動していれば、動かさずに失敗（bit4=1）とする。手順は (1) 指定側へ HOME_SPEED（加速度 ACCEL）で移動する。開始時にすでに指定側が作動していれば (3) から始める。(2) 指定側の入力が作動したらパルスを即停止する。(3) 反対方向へ START_SPEED（HOME_SPEED を超える場合は HOME_SPEED）で、入力が非作動になるまで移動し、非作動の確定で即停止する。(4) POSITION を 0 にし、INPUT_STATUS bit3（原点確定済み）を 1 にする |
+| FR-HOME-06 | 原点復帰中は INPUT_STATUS bit2 を 1、STATUS bit0（MOVING）を 1 にする。STOP・ESTOP・DISABLE・通信タイムアウト（FR-MON-09）・FAULT で中止し、bit2 を 0、bit4（失敗）を 1 にする。(1) の途中で反対側の入力が作動した場合（スイッチの取り違え）、および (3) で START_SPEED により 1 回転分（STEPS_PER_REV × MICROSTEP ステップ）動いても非作動にならない場合も、即停止して失敗とする。(1) で中止の原因になる反対側の作動は、開始後に新たに作動した場合だけとする（開始時から作動していれば、そこから離れる方向へ探索する）。(3) の途中で反対側が作動した場合と、指令によらずパルスが止まった場合も失敗とする。原点復帰中の MOVE_ABS・MOVE_REL・RUN_SPEED（0 以外）・ジョグは CMD_RESULT=1 で拒否し、RUN_SPEED=0 は減速停止として原点復帰を中止する。新しい原点復帰を始めると bit3・bit4 を 0 にする。bit3 は次の原点復帰の開始まで保持する |
 | FR-HOME-07 | 原点復帰の完了で POSITION を再定義するため、SET_POSITION と同じく FR-POS-09 の自動 SYNC_POSITION の対象外になる（SYNC_POSITION と原点復帰のどちらを使うかは上位側が決める） |
 | FR-HOME-08 | USB の名前表に、HOME1・HOME2 の確定レベル、INPUT_STATUS、原点復帰の内部状態を登録する |
 
