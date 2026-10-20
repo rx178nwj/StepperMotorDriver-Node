@@ -5,7 +5,9 @@
 | 対象基板 | SteppingMotorDriver_NEMA23（`schematic/schematic.kicad_sch` 2026-10-11 版） |
 | MCU | STM32L433CCU6（UFQFPN48、Flash 256KB / SRAM 64KB）＝回路図参照 IC2 |
 | モータドライバ | TB67S249FTG＝回路図参照 IC1 |
-| 版 | 0.10（2026-10-20：実装との差の解消（FR-MON-04・08、FR-USB-52、3.8 節）と P2 の補足（FR-USB-62、FR-HOME-03、FR-BL-04）） |
+| 版 | 0.11（2026-10-20：位置決めの減速と目標変更（FR-MOT-03・04）、SYNC_POSITION の値の範囲（FR-POS-06・07）を明確化） |
+
+**0.11 での変更**：ホスト単体テスト（フェーズ C）で見つかった実装との差を、次のとおり決めた。(1) FR-MOT-03：位置決めで一度減速に入ったら、目標が変わるまで減速を続け、減速中に速度を上げない（速度は 加速→一定→減速 の順で、減速中は単調に下がる）。(2) FR-MOT-04：動作中に、残りの距離が減速距離より短い目標へ変えた場合は、減速度 d を守って減速し、目標を行き過ぎて停止してから、逆方向に目標へ戻る（FR-MOT-06 と同じく、停止してから DIR を切り替える）。減速度の上限を超えて目標で急停止しない。(3) FR-POS-06・07：SYNC_POSITION の結果は 0〜N−1（N = GEAR_RATIO × STEPS_PER_REV × MICROSTEP）とし、四捨五入で N になった場合は 0 にする。N が符号付き 32bit の最大値を超える設定では、SYNC_POSITION（自動を含む）を実行せず CMD_RESULT=2 とする。
 
 **0.10 での変更**：実装との差を解消し、P2 の要求を補足した。(1) FR-MON-04：励磁中の VM 範囲外は、10 ms 周期で 2 回連続して範囲外になったとき（最大約 20 ms）に FAULT とする。1 回の判定では ADC のノイズやモータ起動時の電圧低下で誤検出しやすいため。(2) FR-MON-08：LO 異常（OPD・ISD・TSD）は出力 OFF では原因を確認できないため、CLEAR_FAULT で解除する。原因が残っていれば、次の ENABLE 後に LO 検出で再び FAULT になる。温度と VM は従来どおり、原因が残っていれば解除しない。(3) FR-USB-52：CAN_REQUEST の書き込み（OP 0x01）とブロードキャスト（CAN_ID 0x000）は再送しない。FW が実行して応答だけが失われた場合の二重実行を防ぐため。(4) 3.8 節：ACCEL・DECEL の範囲（1〜10,000,000 step/s²）と、MAX_SPEED・START_SPEED・JOG_SPEED の範囲（1〜100,000 step/s）をレジスタ表に追記した。(5) FR-COM-12：未送信の異常通知を新しい通知で上書きした場合も tx_dropped に計上する。(6) P2 の補足：FR-USB-62（DFU デバイスの検出方法）、FR-HOME-03（進行方向の判定）、FR-BL-04（移行フラグの置き場所）。FR-USB-33 は変更しない（FW を仕様どおり、ECC エラーの時点で読み出しを中止するように修正した）。
 
@@ -146,8 +148,8 @@ DMODE 対応表（データシートの列順は DMODE0, DMODE1, DMODE2）：
 |---|---|
 | FR-MOT-01 | TIM1_CH1 のハードウェア PWM で CLK を生成する。パルス幅 High ≥ 1 µs、Low ≥ 1 µs（データシート最小 500 ns） |
 | FR-MOT-02 | ステップ速度範囲：1〜100,000 step/s（マイクロステップ単位）。TB67S249 の入力上限 1 MHz に対して CPU 負荷で制限する |
-| FR-MOT-03 | 台形加減速：開始速度 v0、最高速度 vmax、加速度 a、減速度 d（step/s²）で 1 ステップごとに速度を更新する（`v² ← v² ± 2a`） |
-| FR-MOT-04 | 位置決めモード：絶対目標位置・相対移動量を指定し、減速距離 `v²/2d` を見込んで目標で停止する |
+| FR-MOT-03 | 台形加減速：開始速度 v0、最高速度 vmax、加速度 a、減速度 d（step/s²）で 1 ステップごとに速度を更新する（`v² ← v² ± 2a`）。位置決めで一度減速に入ったら、目標の変更・停止指令があるまで減速を続け、減速中に速度を上げない（速度は 加速→一定→減速 の順で、減速中は単調に下がる。最高速度に届かない短い移動でも同じ） |
+| FR-MOT-04 | 位置決めモード：絶対目標位置・相対移動量を指定し、減速距離 `v²/2d` を見込んで目標で停止する。動作中に、残りの距離が減速距離より短い目標へ変えた場合は、減速度 d を守って減速して目標を行き過ぎ、停止してから逆方向へ目標に戻る（FR-MOT-06 と同じく DIR は停止中に切り替える）。減速度の上限を超えて目標で急停止しない |
 | FR-MOT-05 | 速度モード：符号付き目標速度で連続回転する。速度変更は加減速を伴う |
 | FR-MOT-06 | 逆方向への指令は、一度減速停止してから DIR を切り替えて再始動する。DIR の変更はパルス停止中のみ行う |
 | FR-MOT-07 | 減速停止（STOP）と即時停止（ESTOP：パルス即停止）を持つ |
@@ -424,8 +426,8 @@ CDC はバイトストリームのため、次のフレームで区切る。
 | FR-POS-03 | I2C の通信が TIM1（パルス生成）・EXTI（LO1/LO2）・CAN の処理を妨げないこと。割り込み優先度はこれらより低くし、メインループを止める時間は 1 トランザクションあたり 1 ms 以内とし、超えたら失敗として扱う（NFR-02、NFR-03、FR-COM-11 を損なわない） |
 | FR-POS-04 | センサが未接続または読み出しに失敗した場合、FAULT にせず動作を続ける。3 回連続で失敗したら無効とし、SENSOR_RAW・SHAFT_ANGLE を 0xFFFF、SENSOR_STATUS の bit3 を 1 にする。無効の間は 1 秒ごとに再接続を試み、成功したら有効に戻す。I2C バスが固着した場合は復帰させる（SCL を最大 9 クロック出す） |
 | FR-POS-05 | 出力軸角度：`a = (RAW − SENSOR_OFFSET) mod 4096`、`SHAFT_ANGLE = a × 36000 / 4096`（四捨五入、0〜35999）。角度の増える方向は AS5600 の DIR ピンのレベルで決まる（PA7_MODE=1 なら FLAGS bit2、それ以外は基板上の DIR の固定。H-12）。ファームウェアでは反転しない |
-| FR-POS-06 | COMMAND 10（SYNC_POSITION、初期位置を設定する初期化コマンド）：現在位置（POSITION）を `a × GEAR_RATIO × STEPS_PER_REV × MICROSTEP / 4096`（四捨五入）に設定し、SENSOR_STATUS の bit4 を 1 にする。計算は 64bit で行う。MOVING 中は拒否（CMD_RESULT=1）、センサ無効のときは実行せず CMD_RESULT=3。SET_POSITION と同様に、停止中のみ受け付ける |
-| FR-POS-07 | 出力軸の可動範囲は 1 回転未満とする（U-10、確定）。SYNC_POSITION の後、POSITION は出力軸 1 回転分のステップ数 `GEAR_RATIO × STEPS_PER_REV × MICROSTEP` の範囲内の軸の絶対位置になる。可動範囲が角度 0 をまたぐ場合は、SENSOR_OFFSET で角度 0 を可動範囲の外へずらす。POSITION が増える方向と SHAFT_ANGLE が増える方向が一致しないときは、FLAGS bit2 で合わせる（変更後は SYNC_POSITION をやり直す） |
+| FR-POS-06 | COMMAND 10（SYNC_POSITION、初期位置を設定する初期化コマンド）：現在位置（POSITION）を `a × GEAR_RATIO × STEPS_PER_REV × MICROSTEP / 4096`（四捨五入）に設定し、SENSOR_STATUS の bit4 を 1 にする。計算は 64bit で行う。結果は 0〜N−1（N = GEAR_RATIO × STEPS_PER_REV × MICROSTEP、出力軸 1 回転分のステップ数）とし、四捨五入で N になった場合は 0 にする。N が符号付き 32bit の最大値（2147483647）を超える設定では実行せず CMD_RESULT=2（起動時の自動実行（FR-POS-09）も行わない）。MOVING 中は拒否（CMD_RESULT=1）、センサ無効のときは実行せず CMD_RESULT=3。SET_POSITION と同様に、停止中のみ受け付ける |
+| FR-POS-07 | 出力軸の可動範囲は 1 回転未満とする（U-10、確定）。SYNC_POSITION の後、POSITION は出力軸 1 回転分のステップ数 `GEAR_RATIO × STEPS_PER_REV × MICROSTEP` の範囲内（0〜N−1）の軸の絶対位置になる。可動範囲が角度 0 をまたぐ場合は、SENSOR_OFFSET で角度 0 を可動範囲の外へずらす。POSITION が増える方向と SHAFT_ANGLE が増える方向が一致しないときは、FLAGS bit2 で合わせる（変更後は SYNC_POSITION をやり直す） |
 | FR-POS-08 | GEAR_RATIO（1〜1000）・SENSOR_OFFSET（0〜4095）・PA7_MODE（0〜2）・FLAGS bit2 は不揮発保存の対象とする（FR-NV-01）。保存レコードは 64 バイトに収める（収まらない場合は版を上げ、版の古い保存レコードは新項目を既定値で補う）。工場出荷値は 3.8 節のレジスタ表の既定値 |
 | FR-POS-09 | 起動後、最初にセンサが有効になった時点で、モータが一度も動いておらず（パルス未出力）、POSITION も SET_POSITION で再定義されていなければ、自動的に SYNC_POSITION と同じ処理を行う（U-12、確定）。モータが動いた後にセンサが有効になった場合は自動では行わず、COMMAND 10 を待つ。センサが無効のままなら POSITION は 0 のまま、SENSOR_STATUS の bit4 は 0 |
 | FR-POS-10 | USB の名前表（FR-USB-37）に、センサの RAW 値、状態、出力軸角度、I2C の成功・失敗回数、PA7_MODE、Z 入力レベルを登録する |
