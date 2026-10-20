@@ -5,7 +5,7 @@ from unittest import mock
 
 from nemadbg import cli, elfinfo
 from nemadbg import protocol as p
-from nemadbg.link import DeviceError, Link, LinkError
+from nemadbg.link import DeviceError, Link, LinkError, UnsafeRetryError
 
 from fakedevice import BOARD_ID, BUILD_ID, RAM_BASE, FakeSerial
 
@@ -91,6 +91,36 @@ class LinkTest(unittest.TestCase):
         with self.assertRaises(LinkError):
             self.link.connect()
         self.assertEqual(len(self.dev.requests), 4)   # 初回 + 再送 3 回
+
+    def _count_can_requests(self) -> int:
+        return len([r for r in self.dev.requests if r[0] == p.CMD_CAN_REQUEST])
+
+    def test_can_write_not_retransmitted(self) -> None:
+        self.link.connect()
+        self.dev.drop_responses = 100
+        with self.assertRaises(UnsafeRetryError) as cm:
+            self.link.can_request(0x100 + BOARD_ID, bytes([0x01, 0x20, 0x01]))   # OP=0x01（書き込み）
+        self.assertIn("実行されたかは不明", str(cm.exception))
+        self.assertIn("regs", str(cm.exception))
+        self.assertEqual(self._count_can_requests(), 1)
+        self.assertEqual(self.link.retransmits, 0)
+
+    def test_can_broadcast_not_retransmitted(self) -> None:
+        self.link.connect()
+        self.dev.drop_responses = 100
+        with self.assertRaises(LinkError):
+            self.link.can_request(0x000, bytes([0x02, 0x00, 0x01]))   # 読み出しでも CAN_ID=0 は再送しない
+        self.assertEqual(self._count_can_requests(), 1)
+
+    def test_can_read_retransmitted(self) -> None:
+        self.link.connect()
+        self.dev.drop_responses = 100
+        with self.assertRaises(LinkError):
+            self.link.can_request(0x100 + BOARD_ID, bytes([0x02, 0x00, 0x04]))
+        self.assertEqual(self._count_can_requests(), 4)   # 初回 + 再送 3 回
+        self.dev.drop_responses = 1
+        self.link.can_request(0x100 + BOARD_ID, bytes([0x02, 0x00, 0x04]))
+        self.assertEqual(self.link.retransmits, 4)
 
     def test_stale_response_ignored(self) -> None:
         self.dev.stale_first = True
@@ -235,6 +265,20 @@ class CliTest(unittest.TestCase):
         code, _, err = run_cli(self.dev, "info")
         self.assertEqual(code, 1)
         self.assertIn("応答がありません", err)
+
+    def test_can_req_write_timeout_message(self) -> None:
+        orig = FakeSerial.write
+
+        def write_and_drop(dev, data):
+            if data[2:3] == bytes([p.CMD_CAN_REQUEST]):
+                dev.drop_responses = 100
+            return orig(dev, data)
+
+        with mock.patch.object(FakeSerial, "write", write_and_drop):
+            code, _, err = run_cli(self.dev, "can-req", "0x103", "012001")
+        self.assertEqual(code, 1)
+        self.assertIn("実行されたかは不明", err)
+        self.assertEqual(len([r for r in self.dev.requests if r[0] == p.CMD_CAN_REQUEST]), 1)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from . import elfinfo
 from . import protocol as p
 from . import registers as regs_mod
 from .link import (DEFAULT_TIMEOUT_S, ConnectInfo, DeviceError, Link, LinkError, SymInfo,
-                   find_ports, open_serial)
+                   UnsafeRetryError, find_ports, open_serial)
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -314,6 +314,9 @@ def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any]
         return EXIT_ERROR
     except DeviceError as e:
         print(f"エラー: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    except UnsafeRetryError as e:
+        print(f"通信エラー（実行結果は不明）: {e}", file=sys.stderr)
         return EXIT_ERROR
     except LinkError as e:
         print(f"通信エラー: {e}", file=sys.stderr)

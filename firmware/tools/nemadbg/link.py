@@ -12,12 +12,32 @@ from . import protocol as p
 
 DEFAULT_TIMEOUT_S = 0.2
 MAX_RETRIES = 3          # 初回送信に加えて再送する最大回数
+CAN_ID_BROADCAST = 0x000
+CAN_OP_WRITE = 0x01
 USB_VID = 0x0483
 USB_PID = 0x5740
 
 
 class LinkError(Exception):
     """通信路の異常（タイムアウト・形式不正）。"""
+
+
+class UnsafeRetryError(LinkError):
+    """再送しない要求（CAN の書き込み・ブロードキャスト）が無応答だった。実行されたかは不明。"""
+
+
+def is_no_retry(cmd: int, params: bytes) -> bool:
+    """再送すると二重実行のおそれがある要求か（FR-USB-52）。
+
+    CAN_REQUEST のうち、CAN データの先頭（OP）が 0x01（書き込み）のもの、
+    および CAN_ID が 0x000（ブロードキャスト）のもの。
+    """
+    if cmd != p.CMD_CAN_REQUEST or len(params) < 3:
+        return False
+    can_id, dlc = struct.unpack_from("<HB", params, 0)
+    if can_id == CAN_ID_BROADCAST:
+        return True
+    return dlc >= 1 and len(params) >= 4 and params[3] == CAN_OP_WRITE
 
 
 class DeviceError(Exception):
@@ -113,7 +133,8 @@ class Link:
         self._ctr = (self._ctr + 1) & 0xFF
         ctr = self._ctr
         frame = p.encode_request(cmd, ctr, params)
-        for attempt in range(self.retries + 1):
+        no_retry = is_no_retry(cmd, params)
+        for attempt in range(1 if no_retry else self.retries + 1):
             if attempt > 0:
                 self.retransmits += 1
             self._responses.clear()
@@ -129,6 +150,10 @@ class Link:
                 if rsp.err != 0:
                     raise DeviceError(cmd, rsp.err)
                 return rsp.data
+        if no_retry:
+            raise UnsafeRetryError(
+                f"コマンド 0x{cmd:02X} に応答がありません（書き込み／ブロードキャストのため再送していません、"
+                f"タイムアウト {self.timeout_s * 1000:.0f} ms）。実行されたかは不明です。regs で状態を確認してください")
         raise LinkError(f"コマンド 0x{cmd:02X} に応答がありません（{self.retries + 1} 回送信、タイムアウト {self.timeout_s * 1000:.0f} ms）")
 
     def wait_events(self, seconds: float) -> List[p.Event]:
