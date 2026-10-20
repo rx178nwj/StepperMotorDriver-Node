@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 from typing import Any, Callable, List, Optional
 
+from . import dfu as dfu_mod
 from . import elfinfo
 from . import protocol as p
 from . import registers as regs_mod
@@ -199,7 +200,7 @@ def read_regs(link: Link, board_id: int, start: int, length: int) -> bytes:
 
 def cmd_regs(args: argparse.Namespace, link: Link, ci: ConnectInfo) -> int:
     start = parse_int(args.start)
-    length = parse_int(args.len) if args.len is not None else regs_mod.REG_END + 1 - start
+    length = parse_int(args.len) if args.len is not None else regs_mod.REG_END - start
     if not 0 <= start <= 0xFF or length < 1 or start + length > 0x100:
         raise CliError("--start / --len が範囲外です")
     image = read_regs(link, ci.board_id, start, length)
@@ -250,6 +251,58 @@ def cmd_events(args: argparse.Namespace, link: Link, ci: ConnectInfo) -> int:
     return EXIT_OK
 
 
+DFU_ERR_ENABLED = 0x33   # ENTER_BOOTLOADER が ENABLED 中に返す ERR（FR-BL-02）
+DFU_WRITE_EXAMPLE = "STM32_Programmer_CLI -c port=usb1 -w {elf} -v -g 0x08000000"
+
+
+def confirm_dfu(args: argparse.Namespace) -> bool:
+    """dfu の確認プロンプト。--yes なら聞かない。"""
+    if args.yes:
+        return True
+    try:
+        ans = args.prompt("ROM ブートローダ（USB DFU）へ移行します。ファームウェアは書き換え用の状態になり、"
+                          "通常の動作は止まります。実行しますか？ [y/N] ")
+    except EOFError:
+        return False
+    return ans.strip().lower() in ("y", "yes")
+
+
+def cmd_dfu(args: argparse.Namespace, link: Link, ci: ConnectInfo) -> int:
+    # ENTER_BOOTLOADER は再送しない。応答が失われても移行済みのおそれがあるため、この時点から DISCONNECT は送らない。
+    # 基板が拒否した（DeviceError）ときだけ、通常どおり DISCONNECT を送る
+    args.no_disconnect = True
+    try:
+        link.enter_bootloader()
+    except DeviceError as e:
+        args.no_disconnect = False
+        if e.err == DFU_ERR_ENABLED:
+            raise CliError("励磁中（ENABLED）のため移行できません。DISABLE してから再実行してください")
+        raise
+    print("ENTER_BOOTLOADER を受け付けました。基板がリセットされ、COM ポートは消えます")
+    try:
+        link.close()   # 以後は COM ポートを使わない（検出中に再列挙されるため先に閉じる）
+    except Exception:
+        pass
+
+    rc = EXIT_OK
+    tools: dfu_mod.DfuTools = args.dfu_tools
+    cli = tools.which()
+    if cli is None:
+        print(f"{dfu_mod.CLI_NAME} が PATH にないため、DFU デバイスの検出を省きます"
+              "（デバイスマネージャーなどで 0483:DF11 を確認してください）")
+    else:
+        print(f"{dfu_mod.CLI_NAME} で DFU デバイス（0483:DF11）を最大 {tools.timeout_s:g} 秒探します ...")
+        if tools.wait_for_dfu(cli):
+            print("DFU デバイス（0483:DF11）を検出しました")
+        else:
+            print(f"{tools.timeout_s:g} 秒以内に DFU デバイスを検出できませんでした", file=sys.stderr)
+            rc = EXIT_ERROR
+    elf = args.elf or "<ELF>"
+    print("書き込みの手順例（nemadbg は書き込まない）:")
+    print("  " + DFU_WRITE_EXAMPLE.format(elf=elf))
+    return rc
+
+
 # ---- 引数 ----
 
 def build_parser() -> argparse.ArgumentParser:
@@ -285,16 +338,23 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("names", nargs="+", metavar="NAME")
     sp.add_argument("--interval", type=float, default=1.0, help="周期 [s]")
     sp.add_argument("--count", type=int, default=None, help="回数（省略時は Ctrl-C まで）")
+    sp = add("dfu", cmd_dfu, "ROM ブートローダ（USB DFU）へ移行（書き込みは行わない）")
+    sp.add_argument("--yes", "-y", action="store_true", default=False, help="確認プロンプトを省略")
     sp = add("events", cmd_events, "イベントを表示し続ける")
     sp.add_argument("--duration", type=float, default=None, help="秒数（省略時は Ctrl-C まで）")
     return ap
 
 
-def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any], Link]] = None) -> int:
+def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any], Link]] = None,
+         prompt: Callable[[str], str] = input, dfu_tools: Optional[dfu_mod.DfuTools] = None) -> int:
     args = build_parser().parse_args(argv)
     args.port = getattr(args, "port", None)
     args.elf = getattr(args, "elf", None)
     args.timeout = getattr(args, "timeout", int(DEFAULT_TIMEOUT_S * 1000))
+    args.yes = getattr(args, "yes", False)
+    args.prompt = prompt
+    args.dfu_tools = dfu_tools or dfu_mod.DfuTools()
+    args.no_disconnect = False   # dfu は移行後に COM ポートが消えるため DISCONNECT を送らない
     if args.command == "read-var" and not args.elf:
         print("エラー: read-var には --elf が必要です", file=sys.stderr)
         return EXIT_ERROR
@@ -305,6 +365,9 @@ def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any]
     link: Optional[Link] = None
     connected = False
     try:
+        if args.command == "dfu" and not confirm_dfu(args):
+            print("中止しました")
+            return EXIT_ERROR
         link = (link_factory or default_link_factory)(args)
         ci = link.connect()
         connected = True
@@ -326,9 +389,13 @@ def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any]
         return EXIT_OK
     finally:
         if link is not None:
-            if connected:
+            if connected and not args.no_disconnect:
                 try:
                     link.disconnect()
                 except (DeviceError, LinkError, KeyboardInterrupt):
                     pass
-            link.close()
+            try:
+                link.close()
+            except Exception:
+                if not args.no_disconnect:
+                    raise

@@ -1,9 +1,10 @@
 import contextlib
+import struct
 import io
 import unittest
 from unittest import mock
 
-from nemadbg import cli, elfinfo
+from nemadbg import cli, dfu, elfinfo
 from nemadbg import protocol as p
 from nemadbg.link import DeviceError, Link, LinkError, UnsafeRetryError
 
@@ -14,12 +15,35 @@ def make_link(dev: FakeSerial, timeout_s: float = 0.03) -> Link:
     return Link(dev, timeout_s=timeout_s)
 
 
-def run_cli(dev: FakeSerial, *argv: str):
+def run_cli(dev: FakeSerial, *argv: str, **kwargs):
     """CLI を擬似デバイスで実行し (終了コード, stdout, stderr) を返す。"""
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = cli.main(["--timeout", "30", *argv], link_factory=lambda a: Link(dev, timeout_s=a.timeout / 1000))
+        code = cli.main(["--timeout", "30", *argv], link_factory=lambda a: Link(dev, timeout_s=a.timeout / 1000),
+                        **kwargs)
     return code, out.getvalue(), err.getvalue()
+
+
+class FakeDfuTools(dfu.DfuTools):
+    """STM32_Programmer_CLI の偽物。時間は進めた分だけ clock が増える（実際には待たない）。"""
+
+    def __init__(self, cli_path="C:/prog/STM32_Programmer_CLI.exe", found_after=None) -> None:
+        self.t = 0.0
+        self.calls = 0
+        self.cli_path = cli_path
+        self.found_after = found_after      # この回数目の実行から DFU デバイスが見える（None なら見えない）
+        super().__init__(which=lambda: self.cli_path, run=self._run, sleep=self._sleep, clock=lambda: self.t)
+
+    def _run(self, cli: str) -> str:
+        self.calls += 1
+        self.t += 0.3                       # CLI 1 回の実行時間
+        if self.found_after is not None and self.calls >= self.found_after:
+            return ("=====  DFU Interface   =====\n\nTotal number of available STM32 device in DFU mode: 1\n\n"
+                    "  Device Index           : USB1\n")
+        return "=====  DFU Interface   =====\n\nNo STM32 device in DFU mode connected\n"
+
+    def _sleep(self, s: float) -> None:
+        self.t += s
 
 
 class LinkTest(unittest.TestCase):
@@ -121,6 +145,26 @@ class LinkTest(unittest.TestCase):
         self.dev.drop_responses = 1
         self.link.can_request(0x100 + BOARD_ID, bytes([0x02, 0x00, 0x04]))
         self.assertEqual(self.link.retransmits, 4)
+
+    def test_enter_bootloader_param_and_no_retry(self) -> None:
+        self.dev.regs[0x04] = 1
+        self.link.connect()
+        self.link.enter_bootloader()
+        reqs = [r for r in self.dev.requests if r[0] == p.CMD_ENTER_BOOTLOADER]
+        self.assertEqual(len(reqs), 1)
+        self.assertEqual(reqs[0][2:], b"BOOT")                       # KEY u32 リトルエンディアン 0x544F4F42
+        self.assertEqual(reqs[0][2:], struct.pack("<I", 0x544F4F42))
+        self.assertTrue(self.dev.bootloader_entered)
+
+    def test_enter_bootloader_lost_response_not_retransmitted(self) -> None:
+        self.dev.regs[0x04] = 1
+        self.link.connect()
+        self.dev.drop_responses = 100
+        with self.assertRaises(UnsafeRetryError) as cm:
+            self.link.enter_bootloader()
+        self.assertIn("実行されたかは不明", str(cm.exception))
+        self.assertEqual(len([r for r in self.dev.requests if r[0] == p.CMD_ENTER_BOOTLOADER]), 1)
+        self.assertEqual(self.link.retransmits, 0)
 
     def test_stale_response_ignored(self) -> None:
         self.dev.stale_first = True
@@ -233,6 +277,23 @@ class CliTest(unittest.TestCase):
         self.assertIn("-100", out)
         self.assertIn("24000", out)
 
+    def test_regs_new_registers(self) -> None:
+        code, out, _ = run_cli(self.dev, "regs")
+        self.assertEqual(code, 0)
+        line = {ln.split()[1]: ln for ln in out.splitlines() if ln.startswith("0x")}
+        self.assertTrue(line["INPUT_STATUS"].startswith("0x1E"))
+        self.assertIn("[HOME1, HOMED]", line["INPUT_STATUS"])
+        self.assertIn("[LOCAL_JOG, AGC, HOME_ACTIVE_HIGH]", line["FLAGS"])
+        self.assertTrue(line["J10_MODE"].startswith("0x59"))
+        self.assertIn("2 (HOME)", line["J10_MODE"])
+        self.assertTrue(line["HOME_SPEED"].startswith("0x5A"))
+        self.assertIn("800", line["HOME_SPEED"])
+        self.assertTrue(line["ENC_COUNT"].startswith("0x5C"))
+        self.assertIn("-7", line["ENC_COUNT"])
+        reads = [r for r in self.dev.requests if r[0] == p.CMD_CAN_REQUEST]
+        self.assertEqual(len(reads), 16)                             # 0x00〜0x5F を 6 B ずつ（0x5A〜0x5F が最後）
+        self.assertEqual(reads[-1][-2:], bytes([0x5A, 6]))
+
     def test_regs_range(self) -> None:
         code, out, _ = run_cli(self.dev, "regs", "--start", "0x08", "--len", "4")
         self.assertEqual(code, 0)
@@ -265,6 +326,107 @@ class CliTest(unittest.TestCase):
         code, _, err = run_cli(self.dev, "info")
         self.assertEqual(code, 1)
         self.assertIn("応答がありません", err)
+
+    def _dfu(self, *args: str, answer="y", tools=None, dev=None):
+        dev = dev or self.dev
+        prompts = []
+
+        def prompt(text: str) -> str:
+            prompts.append(text)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+        tools = tools or FakeDfuTools(found_after=2)
+        code, out, err = run_cli(dev, "dfu", *args, prompt=prompt, dfu_tools=tools)
+        return code, out, err, prompts, tools
+
+    def test_dfu_prompt_yes(self) -> None:
+        self.dev.regs[0x04] = 1
+        code, out, err, prompts, tools = self._dfu()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(len(prompts), 1)
+        self.assertTrue(self.dev.bootloader_entered)
+        self.assertIn("検出しました", out)
+        self.assertIn("STM32_Programmer_CLI -c port=usb1 -w <ELF> -v -g 0x08000000", out)
+        self.assertEqual(tools.calls, 2)
+
+    def test_dfu_prompt_declined(self) -> None:
+        for ans in ("n", "", "no", EOFError()):
+            dev = FakeSerial()
+            dev.regs[0x04] = 1
+            code, out, _, prompts, _ = self._dfu(answer=ans, dev=dev)
+            self.assertEqual(code, 1)
+            self.assertEqual(len(prompts), 1)
+            self.assertIn("中止", out)
+            self.assertEqual(dev.requests, [])                       # 接続もしない
+            self.assertFalse(dev.bootloader_entered)
+
+    def test_dfu_yes_option_skips_prompt(self) -> None:
+        self.dev.regs[0x04] = 1
+        code, _, _, prompts, _ = self._dfu("--yes")
+        self.assertEqual(code, 0)
+        self.assertEqual(prompts, [])
+        self.assertTrue(self.dev.bootloader_entered)
+
+    def test_dfu_does_not_send_disconnect(self) -> None:
+        self.dev.regs[0x04] = 1
+        self._dfu("--yes")
+        self.assertEqual([r[0] for r in self.dev.requests], [p.CMD_CONNECT, p.CMD_ENTER_BOOTLOADER])
+        self.assertTrue(self.dev.closed)
+
+    def test_dfu_enabled_err_0x33_message(self) -> None:
+        self.dev.regs[0x04] = 2
+        code, out, err, _, tools = self._dfu("--yes")
+        self.assertEqual(code, 1)
+        self.assertIn("励磁中（ENABLED）", err)
+        self.assertIn("DISABLE", err)
+        self.assertFalse(self.dev.bootloader_entered)
+        self.assertEqual(tools.calls, 0)                             # 検出もしない
+        self.assertEqual(self.dev.requests[-1][0], p.CMD_DISCONNECT)  # 拒否されたときは通常どおり切断する
+
+    def test_dfu_lost_response_not_retried_no_disconnect(self) -> None:
+        self.dev.regs[0x04] = 1
+        orig = FakeSerial.write
+
+        def write_and_drop(dev, data):
+            if data[2:3] == bytes([p.CMD_ENTER_BOOTLOADER]):
+                dev.drop_responses = 100
+            return orig(dev, data)
+
+        with mock.patch.object(FakeSerial, "write", write_and_drop):
+            code, _, err, _, tools = self._dfu("--yes")
+        self.assertEqual(code, 1)
+        self.assertIn("実行されたかは不明", err)
+        self.assertEqual([r[0] for r in self.dev.requests], [p.CMD_CONNECT, p.CMD_ENTER_BOOTLOADER])
+        self.assertEqual(tools.calls, 0)
+
+    def test_dfu_without_programmer_cli(self) -> None:
+        self.dev.regs[0x04] = 1
+        tools = FakeDfuTools(cli_path=None)
+        code, out, _, _, _ = self._dfu("--yes", "--elf", "app.elf", tools=tools)
+        self.assertEqual(code, 0)
+        self.assertEqual(tools.calls, 0)
+        self.assertIn("PATH にない", out)
+        self.assertIn("検出を省き", out)
+        self.assertIn("STM32_Programmer_CLI -c port=usb1 -w app.elf -v -g 0x08000000", out)
+
+    def test_dfu_not_detected_in_5_seconds(self) -> None:
+        self.dev.regs[0x04] = 1
+        tools = FakeDfuTools(found_after=None)
+        code, out, err, _, _ = self._dfu("--yes", tools=tools)
+        self.assertEqual(code, 1)
+        self.assertIn("検出できませんでした", err)
+        self.assertGreater(tools.calls, 3)
+        self.assertLessEqual(tools.t, 5.0 + 0.3 + 0.5)               # 最大 5 秒（最後の 1 回分の実行時間を含む）
+        self.assertIn("STM32_Programmer_CLI -c port=usb1", out)      # 手順は表示する
+
+    def test_dfu_listing_formats(self) -> None:
+        self.assertFalse(dfu.is_dfu_listed("=====  DFU Interface   =====\n\nNo STM32 device in DFU mode connected\n"))
+        self.assertFalse(dfu.is_dfu_listed(""))
+        self.assertTrue(dfu.is_dfu_listed("Total number of available STM32 device in DFU mode: 1\n"))
+        self.assertFalse(dfu.is_dfu_listed("Total number of available STM32 device in DFU mode: 0\n"))
+        self.assertTrue(dfu.is_dfu_listed("  Device Index           : USB1\n"))
 
     def test_can_req_write_timeout_message(self) -> None:
         orig = FakeSerial.write

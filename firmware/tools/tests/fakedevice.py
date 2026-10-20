@@ -36,6 +36,11 @@ class FakeSerial:
         self.regs[0x03] = BOARD_ID
         self.regs[0x04] = 2
         self.regs[0x06] = 0x84
+        self.regs[0x1E] = 0x09                     # HOME1 作動、原点確定済み
+        self.regs[0x25] = 0x1A                     # LOCAL_JOG、AGC、HOME_ACTIVE_HIGH
+        self.regs[0x59] = 2                        # J10_MODE=HOME
+        struct.pack_into("<H", self.regs, 0x5A, 800)
+        struct.pack_into("<i", self.regs, 0x5C, -7)
         struct.pack_into("<i", self.regs, 0x08, -100)
         struct.pack_into("<H", self.regs, 0x10, 24000)
         self.connected = False
@@ -45,6 +50,7 @@ class FakeSerial:
         self.drop_responses = 0             # 先頭からこの数だけ応答を捨てる（タイムアウト試験）
         self.stale_first = False            # 最初の応答の前に CTR 違いの応答を挟む
         self.closed = False
+        self.bootloader_entered = False     # ENTER_BOOTLOADER を受け付けた（以後は応答しない想定）
 
     # ---- serial 互換 ----
     @property
@@ -102,6 +108,16 @@ class FakeSerial:
         if not self.connected:
             return 0x35, b""
         if cmd == p.CMD_DISCONNECT:
+            self.connected = False
+            return 0, b""
+        if cmd == p.CMD_ENTER_BOOTLOADER:
+            if len(body) != 6:
+                return 0x31, b""
+            if struct.unpack_from("<I", body, 2)[0] != p.BOOT_KEY:
+                return 0x32, b""
+            if self.regs[0x04] == 2:        # ENABLED 中
+                return 0x33, b""
+            self.bootloader_entered = True
             self.connected = False
             return 0, b""
         if cmd == p.CMD_EXCHANGE_ID:

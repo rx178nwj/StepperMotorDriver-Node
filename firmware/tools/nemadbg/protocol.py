@@ -27,13 +27,15 @@ CMD_SYM_INFO = 0x21
 CMD_SYM_FIND = 0x22
 CMD_SYM_UPLOAD = 0x23
 CMD_CAN_REQUEST = 0x40
+CMD_ENTER_BOOTLOADER = 0x50
+BOOT_KEY = 0x544F4F42      # "BOOT"（ENTER_BOOTLOADER の KEY、u32 リトルエンディアン）
 
 ERR_NAMES: Dict[int, str] = {
     0x00: "OK",
     0x30: "未定義コマンド",
     0x31: "コマンド構文エラー",
     0x32: "パラメータ範囲外",
-    0x33: "アクセス拒否",
+    0x33: "アクセス拒否",   # ENTER_BOOTLOADER では ENABLED 中
     0x35: "アクセスロック（未接続）",
     0x36: "リソースなし",
 }

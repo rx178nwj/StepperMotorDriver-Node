@@ -26,6 +26,7 @@ class Reg:
 STATE_NAMES = {0: "NO_VM", 1: "DISABLED", 2: "ENABLED", 3: "FAULT"}
 CMD_RESULT_NAMES = {0: "OK", 1: "状態により拒否", 2: "値・アドレス不正", 3: "実行失敗"}
 PA7_MODE_NAMES = {0: "AD_IN", 1: "DIR", 2: "Z"}
+J10_MODE_NAMES = {0: "未使用", 1: "ENC", 2: "HOME"}
 
 REGISTERS: List[Reg] = [
     Reg(0x00, "DEVICE_ID", 1, False, "R"),
@@ -51,10 +52,12 @@ REGISTERS: List[Reg] = [
         (0, "VALID"), (1, "MH"), (2, "ML"), (3, "NO_RESPONSE"), (4, "SYNCED"), (5, "Z_LEVEL"))),
     Reg(0x1A, "SENSOR_RAW", 2, False, "R"),
     Reg(0x1C, "SHAFT_ANGLE", 2, False, "R"),
+    Reg(0x1E, "INPUT_STATUS", 1, False, "R", bits=(
+        (0, "HOME1"), (1, "HOME2"), (2, "HOMING"), (3, "HOMED"), (4, "HOME_FAILED"), (5, "LIMIT_STOP"))),
     Reg(0x20, "RUN_CURRENT", 2, False, "RW"),
     Reg(0x22, "HOLD_CURRENT", 2, False, "RW"),
     Reg(0x24, "MICROSTEP", 1, False, "RW"),
-    Reg(0x25, "FLAGS", 1, False, "RW", bits=((0, "DIR_INVERT"), (1, "LOCAL_JOG"), (2, "SENSOR_DIR"))),
+    Reg(0x25, "FLAGS", 1, False, "RW", bits=((0, "DIR_INVERT"), (1, "LOCAL_JOG"), (2, "SENSOR_DIR"), (3, "AGC"), (4, "HOME_ACTIVE_HIGH"))),
     Reg(0x26, "COMM_TIMEOUT", 2, False, "RW"),
     Reg(0x28, "MAX_SPEED", 4, False, "RW"),
     Reg(0x2C, "ACCEL", 4, False, "RW"),
@@ -71,11 +74,14 @@ REGISTERS: List[Reg] = [
     Reg(0x54, "GEAR_RATIO", 2, False, "RW"),
     Reg(0x56, "SENSOR_OFFSET", 2, False, "RW"),
     Reg(0x58, "PA7_MODE", 1, False, "RW", enum=PA7_MODE_NAMES),
+    Reg(0x59, "J10_MODE", 1, False, "RW", enum=J10_MODE_NAMES),
+    Reg(0x5A, "HOME_SPEED", 2, False, "RW"),
+    Reg(0x5C, "ENC_COUNT", 4, True, "R"),
 ]
 
 INVALID_FFFF = ('AD_IN_MV', 'SENSOR_RAW', 'SHAFT_ANGLE')   # 無効時 0xFFFF
 
-REG_END = 0x59   # 最後のレジスタの末尾アドレス（含む）
+REG_END = 0x60   # レジスタ空間の終端（含まない）。regs は 0x5F まで読む
 
 
 def decode_value(reg: Reg, raw: bytes) -> int:

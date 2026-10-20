@@ -29,9 +29,12 @@ class UnsafeRetryError(LinkError):
 def is_no_retry(cmd: int, params: bytes) -> bool:
     """再送すると二重実行のおそれがある要求か（FR-USB-52）。
 
+    ENTER_BOOTLOADER は、応答だけ失われると移行済みかどうか分からなくなるため再送しない。
     CAN_REQUEST のうち、CAN データの先頭（OP）が 0x01（書き込み）のもの、
     および CAN_ID が 0x000（ブロードキャスト）のもの。
     """
+    if cmd == p.CMD_ENTER_BOOTLOADER:
+        return True
     if cmd != p.CMD_CAN_REQUEST or len(params) < 3:
         return False
     can_id, dlc = struct.unpack_from("<HB", params, 0)
@@ -150,6 +153,10 @@ class Link:
                 if rsp.err != 0:
                     raise DeviceError(cmd, rsp.err)
                 return rsp.data
+        if no_retry and cmd == p.CMD_ENTER_BOOTLOADER:
+            raise UnsafeRetryError(
+                f"ENTER_BOOTLOADER に応答がありません（再送していません、タイムアウト {self.timeout_s * 1000:.0f} ms）。"
+                "実行されたかは不明です。COM ポートが消えていれば移行済みです")
         if no_retry:
             raise UnsafeRetryError(
                 f"コマンド 0x{cmd:02X} に応答がありません（書き込み／ブロードキャストのため再送していません、"
@@ -218,6 +225,10 @@ class Link:
             params = bytes([len(raw)]) + raw + struct.pack("<HB", len(out), n)
             out += self.request(p.CMD_SYM_UPLOAD, params)
         return bytes(out)
+
+    def enter_bootloader(self) -> None:
+        """ROM ブートローダ（USB DFU）への移行を要求する。再送しない。ACK のあと基板はリセットして COM ポートが消える。"""
+        self.request(p.CMD_ENTER_BOOTLOADER, struct.pack("<I", p.BOOT_KEY))
 
     def can_request(self, can_id: int, data: bytes = b"") -> List[p.CanFrame]:
         params = p.encode_can(p.CanFrame(can_id, data))
