@@ -10,6 +10,8 @@
 #include "board.h"
 #include "config.h"
 #include "drv.h"
+#include "home.h"
+#include "j10.h"
 #include "monitor.h"
 #include "position.h"
 #include "settings.h"
@@ -49,6 +51,14 @@ static unsigned g_calls_n;
 static int32_t g_to, g_by, g_run, g_setpos_arg;
 static bool g_running, g_pending, g_setpos_ok = true;
 static int32_t g_pos;
+/* 原点・リミットのテスト用:
+ *   g_dir      stepper_motion_dir が返す進行方向（パルス出力中のみ有効）
+ *   g_sim      true なら、stepper_run で起動待ちになり、stepper_service で出力中へ、stepper_estop で停止へ遷移する
+ *              （false の間は g_running・g_pending をテストが直接決める）
+ *   g_touched  stepper_set_position が成功した（実物の touched と同じ。自動 SYNC の判断）
+ */
+static int8_t g_dir, g_pend_dir;
+static bool g_sim, g_touched;
 static unsigned g_pos_calls, g_speed_calls;
 
 static void log_call(char c)
@@ -63,10 +73,34 @@ void stepper_init(void) {}
 void stepper_set_params(const stepper_params_t *p) { (void)p; }
 void stepper_move_to(int32_t t) { g_to = t; log_call('T'); }
 void stepper_move_by(int32_t d) { g_by = d; log_call('B'); }
-void stepper_run(int32_t s) { g_run = s; log_call('R'); }
+void stepper_run(int32_t s)
+{
+    g_run = s;
+    log_call('R');
+    if (g_sim) {
+        g_pending = s != 0;
+        g_pend_dir = s > 0 ? 1 : -1;
+    }
+}
 void stepper_stop(void) { log_call('S'); }
-void stepper_estop(void) { log_call('E'); }
-bool stepper_service(void) { return false; }
+void stepper_estop(void)
+{
+    log_call('E');
+    if (g_sim) {
+        g_running = g_pending = false;
+    }
+}
+bool stepper_service(void)
+{
+    if (g_sim && g_pending && !g_running) {
+        g_running = true;
+        g_pending = false;
+        g_dir = g_pend_dir;
+        return true;
+    }
+    return false;
+}
+int8_t stepper_motion_dir(void) { return g_running ? g_dir : 0; }
 bool stepper_has_pending(void) { return g_pending; }
 bool stepper_is_running(void) { return g_running; }
 bool stepper_set_position(int32_t p)
@@ -77,10 +111,11 @@ bool stepper_set_position(int32_t p)
         return false;
     }
     g_pos = p;
+    g_touched = true;
     return true;
 }
 bool stepper_at_target(void) { return false; }
-bool stepper_touched(void) { return false; }
+bool stepper_touched(void) { return g_touched; }
 void stepper_timer_isr(void) {}
 
 /* 読み出しのたびに値が変わる（スナップショットの検査用）。n 回目の呼び出しは pos = 0x01020304 + n × 0x04040404 */
@@ -152,7 +187,8 @@ void monitor_sample(monitor_values_t *out, bool ad)
 
 void position_init(void) {}
 void position_poll_10ms(uint32_t n) { (void)n; }
-bool position_valid(void) { return false; }
+static bool g_pos_valid;   /* position_valid の戻り値（自動 SYNC のテスト用） */
+bool position_valid(void) { return g_pos_valid; }
 uint16_t position_raw(void) { return 0xFFFFu; }
 uint8_t position_status_bits(void) { return 0; }
 void position_pa7_set(uint8_t m, bool d) { (void)m; (void)d; }
@@ -167,8 +203,9 @@ bool position_sync_steps(uint16_t a, uint16_t g, uint16_t s, uint8_t m, int32_t 
 
 void ui_update(uint32_t n, const ui_view_t *v) { (void)n; (void)v; }
 void ui_scan_switches(void) {}
-bool ui_sw1(void) { return false; }
-bool ui_sw2(void) { return false; }
+static bool g_sw1, g_sw2;   /* SWITCH1・SWITCH2（ジョグ） */
+bool ui_sw1(void) { return g_sw1; }
+bool ui_sw2(void) { return g_sw2; }
 
 void comm_init(uint8_t id) { (void)id; }
 void comm_poll(void) {}
@@ -263,6 +300,10 @@ static void boot(void)
     g_calls_n = 0;
     g_calls[0] = 0;
     g_running = g_pending = false;
+    g_sim = g_touched = g_pos_valid = false;
+    g_dir = g_pend_dir = 0;
+    g_sw1 = g_sw2 = false;
+    g_gpioa.IDR = 0xFFFFFFFFu;  /* J10 入力はすべて High（アクティブ Low の既定では非作動） */
     g_setpos_ok = true;
     g_vary = false;
     g_pos = 0;
@@ -1172,6 +1213,828 @@ static void test_agc_does_not_change_fault_handling(void)
     }
 }
 
+/* ---------------------------------------------------------------- P2：J10 の切り替え・ENC・HOME（3.12 節、E3・E4） */
+
+#define R_STATUS  0x06
+#define R_INPUT   0x1E
+
+static uint32_t pin_moder(unsigned pin) { return (g_gpioa.MODER >> (pin * 2u)) & 3u; }
+static uint32_t pin_pupdr(unsigned pin) { return (g_gpioa.PUPDR >> (pin * 2u)) & 3u; }
+static uint32_t pin_afr(unsigned pin) { return (g_gpioa.AFR[pin >> 3] >> ((pin & 7u) * 4u)) & 0xFu; }
+
+/* PA15（HOME1）・PA1（HOME2）の入力レベルを直接設定する */
+static void set_levels(bool l1, bool l2)
+{
+    g_gpioa.IDR = (l1 ? GPIO_PIN_15 : 0u) | (l2 ? GPIO_PIN_1 : 0u);
+}
+
+/* アクティブ Low（FLAGS bit4 = 0）で、a1 / a2 が true の入力を作動（Low）にする */
+static void home_pins(bool a1, bool a2)
+{
+    set_levels(!a1, !a2);
+}
+
+static void calls_clear(void)
+{
+    g_calls_n = 0;
+    g_calls[0] = 0;
+}
+
+/* ENABLED・J10_MODE=2・電流切替待ちが済んだ状態。sim = true なら起動待ち→出力中の遷移を模擬する */
+static void to_home_ready(bool sim)
+{
+    to_enabled();
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    g_sim = sim;
+    home_pins(false, false);
+    tick1(10);
+    CHECK(rd8(R_INPUT) == 0);
+    calls_clear();
+}
+
+/* 起動時に保存設定の J10_MODE が端子へ反映される（設定を読み込んでから設定。FR-J10-01） */
+static void test_j10_applied_at_boot(void)
+{
+    settings_t s;
+    for (uint8_t m = 0; m <= 2; m++) {
+        settings_defaults(&s);
+        s.j10_mode = m;
+        nv_put(&s);
+        g_tim2.CNT = 0x55;
+        boot();
+        CHECK(rd8(0x59) == m);
+        if (m == 0) {
+            CHECK(pin_moder(15) == 3u && pin_moder(1) == 3u);
+            CHECK(pin_pupdr(15) == 0u && pin_pupdr(1) == 0u);
+            CHECK(g_tim2_clk == 0);
+        } else if (m == 1) {
+            CHECK(pin_moder(15) == 2u && pin_moder(1) == 2u);
+            CHECK(pin_afr(15) == 1u && pin_afr(1) == 1u);
+            CHECK(pin_pupdr(15) == 1u && pin_pupdr(1) == 1u);
+            CHECK((g_tim2.CR1 & TIM_CR1_CEN) != 0u && (g_tim2.SMCR & 7u) == 3u);
+            CHECK(rd32(0x5C) == 0u);   /* 起動時に 0 */
+        } else {
+            CHECK(pin_moder(15) == 0u && pin_moder(1) == 0u);
+            CHECK(pin_pupdr(15) == 1u && pin_pupdr(1) == 1u);
+            CHECK((g_tim2.CR1 & TIM_CR1_CEN) == 0u);
+        }
+    }
+    /* 保存設定なしの既定（J10_MODE=0）でもアナログに設定する */
+    g_gpioa.MODER = 0;
+    setup();
+    CHECK(rd8(0x59) == 0);
+    CHECK(pin_moder(15) == 3u && pin_moder(1) == 3u);
+}
+
+/* J10_MODE の書き込みで即時に端子が切り替わる（FR-J10-02）。範囲外は反映しない */
+static void test_j10_mode_write_switches_pins(void)
+{
+    setup();
+    CHECK(wr8(0x59, 1) == RESULT_OK);
+    CHECK(pin_moder(15) == 2u && pin_afr(15) == 1u && pin_afr(1) == 1u && (g_tim2.CR1 & TIM_CR1_CEN) != 0u);
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    CHECK(pin_moder(15) == 0u && pin_moder(1) == 0u && pin_pupdr(15) == 1u);
+    CHECK((g_tim2.CR1 & TIM_CR1_CEN) == 0u && g_tim2_clk == 0);
+    CHECK(wr8(0x59, 3) == RESULT_INVALID);
+    CHECK(pin_moder(15) == 0u);                  /* 反映しない */
+    CHECK(wr8(0x59, 0) == RESULT_OK);
+    CHECK(pin_moder(15) == 3u && pin_moder(1) == 3u && pin_pupdr(15) == 0u);
+
+    /* 保存設定への LOAD でも反映する */
+    settings_t s;
+    settings_defaults(&s);
+    s.j10_mode = 2;
+    nv_put(&s);
+    CHECK(wr8(0x50, CMD_LOAD_SETTINGS) == RESULT_OK);
+    CHECK(rd8(0x59) == 2 && pin_moder(15) == 0u && pin_pupdr(15) == 1u);
+    /* FACTORY で既定（0）に戻ると端子もアナログへ */
+    CHECK(wr8(0x50, CMD_FACTORY_SETTINGS) == RESULT_OK);
+    CHECK(rd8(0x59) == 0 && pin_moder(15) == 3u);
+}
+
+/* ENC_COUNT（0x5C）: モード 1 なら TIM2->CNT を符号付き 32bit で。それ以外は 0（FR-ENC-03、FR-J10-03） */
+static void test_enc_count_register(void)
+{
+    setup();
+    g_tim2.CNT = 0x1234;                         /* モード 0 では 0 */
+    CHECK(rd32(0x5C) == 0u);
+    CHECK(wr8(0x59, 1) == RESULT_OK);
+    CHECK(rd32(0x5C) == 0u);                     /* 切り替え直後は 0 */
+    g_tim2.CNT = 1000;
+    CHECK(rd32(0x5C) == 1000u);
+    g_tim2.CNT = 0xFFFFFFF6u;
+    CHECK((int32_t)rd32(0x5C) == -10);
+    uint8_t b[4];
+    app_reg_read(0x5C, 4, b);                    /* リトルエンディアン */
+    CHECK(b[0] == 0xF6 && b[1] == 0xFF && b[2] == 0xFF && b[3] == 0xFF);
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    CHECK(rd32(0x5C) == 0u);                     /* モード 2 では 0 */
+    CHECK(wr8(0x59, 0) == RESULT_OK);
+    CHECK(rd32(0x5C) == 0u);
+}
+
+/* INPUT_STATUS bit0〜1: J10_MODE=2 のとき確定した作動状態。論理は FLAGS bit4（FR-HOME-02）。他のモードは 0 */
+static void test_input_status_bits(void)
+{
+    setup();
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    home_pins(false, false);
+    tick1(3);
+    CHECK(rd8(R_INPUT) == 0);
+
+    home_pins(true, false);                      /* HOME1 作動（Low） */
+    tick1(1);
+    CHECK(rd8(R_INPUT) == 0);                    /* 1 回目では確定しない */
+    tick1(1);
+    CHECK(rd8(R_INPUT) == 0x01);
+    home_pins(true, true);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x03);
+    home_pins(false, true);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x02);
+    home_pins(false, false);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x00);
+
+    /* FLAGS bit4 = 1: アクティブ High（High が作動）。両入力共通 */
+    CHECK(wr8(0x25, 0x12) == RESULT_OK);
+    set_levels(false, false);
+    tick1(3);
+    CHECK(rd8(R_INPUT) == 0x00);                 /* 全入力 Low → 非作動 */
+    set_levels(true, false);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x01);
+    set_levels(false, true);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x02);
+    set_levels(true, true);
+    tick1(2);
+    CHECK(rd8(R_INPUT) == 0x03);
+
+    /* モード 0・1 では入力が作動レベルでも 0 */
+    CHECK(wr8(0x59, 0) == RESULT_OK);
+    set_levels(false, false);
+    CHECK(wr8(0x25, 0x02) == RESULT_OK);
+    home_pins(true, true);
+    tick1(4);
+    CHECK(rd8(R_INPUT) == 0);
+    CHECK(wr8(0x59, 1) == RESULT_OK);
+    tick1(4);
+    CHECK(rd8(R_INPUT) == 0);
+}
+
+/* 1 ms のグリッチ（1 サンプルだけの変化）では確定しない */
+static void test_input_status_glitch(void)
+{
+    setup();
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    home_pins(false, false);
+    tick1(3);
+    home_pins(true, false);
+    tick1(1);
+    home_pins(false, false);
+    tick1(3);
+    CHECK(rd8(R_INPUT) == 0);
+}
+
+/* 進行方向側のリミットが作動したら ESTOP（励磁は維持、FAULT にしない）、INPUT_STATUS bit5=1（FR-HOME-03）。
+ * 入力の確定と同じ 1 ms の周期処理の中で止める */
+static void test_limit_stop_directions(void)
+{
+    for (int pass = 0; pass < 2; pass++) {
+        /* pass 1 では FLAGS bit0（方向反転）を立てる。進行方向は POSITION の増減で判定するので結果は同じ */
+        for (int side = 1; side >= -1; side -= 2) {
+            to_home_ready(false);
+            if (pass == 1) {
+                CHECK(wr8(0x25, 0x03) == RESULT_OK);
+            }
+            dlog_clear();
+            calls_clear();
+            g_running = true;
+            g_dir = (int8_t)side;
+            tick1(3);
+            CHECK(strchr(g_calls, 'E') == NULL);
+
+            /* 進行方向と反対側の入力が作動しても止めない */
+            home_pins(side < 0, side > 0);
+            tick1(4);
+            CHECK(strchr(g_calls, 'E') == NULL);
+            CHECK((rd8(R_INPUT) & 0x20) == 0);
+
+            /* 進行方向側が作動: 確定した tick の中で止まる */
+            home_pins(false, false);
+            tick1(2);
+            home_pins(side > 0, side < 0);
+            tick1(1);
+            CHECK(strchr(g_calls, 'E') == NULL);   /* まだ確定していない */
+            tick1(1);
+            CHECK((rd8(R_INPUT) & (side > 0 ? 0x01 : 0x02)) != 0);   /* この tick で確定 */
+            CHECK(strchr(g_calls, 'E') != NULL);                      /* 同じ tick で ESTOP */
+            CHECK((rd8(R_INPUT) & 0x20) != 0);                        /* bit5 */
+            CHECK(rd8(R_STATE) == APP_ENABLED);                       /* FAULT にしない */
+            CHECK(rd8(R_FAULT) == 0);
+            CHECK(strchr(g_dlog, 'D') == NULL);                       /* 励磁は維持 */
+            CHECK((rd8(R_INPUT) & 0x1C) == 0);                        /* 原点復帰ではない（bit2〜4） */
+        }
+    }
+}
+
+/* モード 2 以外、パルス停止中、入力が非作動なら止めない */
+static void test_limit_stop_conditions(void)
+{
+    /* 停止中に作動しても ESTOP は呼ばない（bit5 も立てない） */
+    to_home_ready(false);
+    home_pins(true, true);
+    tick1(4);
+    CHECK(rd8(R_INPUT) == 0x03);
+    CHECK(strchr(g_calls, 'E') == NULL);
+
+    /* モード 0 / 1 では入力が作動レベルでもリミット停止しない */
+    for (uint8_t m = 0; m <= 1; m++) {
+        to_home_ready(false);
+        CHECK(wr8(0x59, m) == RESULT_OK);
+        calls_clear();
+        g_running = true;
+        g_dir = 1;
+        home_pins(true, true);
+        tick1(5);
+        CHECK(strchr(g_calls, 'E') == NULL);
+        CHECK((rd8(R_INPUT) & 0x20) == 0);
+    }
+}
+
+/* 作動しているリミット側への MOVE_ABS・MOVE_REL・RUN_SPEED は CMD_RESULT=1。反対側と、方向のない指令は受け付ける（FR-HOME-04） */
+static void test_move_rejected_at_limit(void)
+{
+    for (int side = 1; side >= -1; side -= 2) {
+        to_home_ready(false);
+        g_pos = 1000;
+        home_pins(side > 0, side < 0);           /* side=+1: HOME1 作動、side=-1: HOME2 作動 */
+        tick1(3);
+        CHECK(rd8(R_INPUT) == (side > 0 ? 0x01 : 0x02));
+        calls_clear();
+        const int32_t dn = side * 100;           /* リミット側へ */
+        const int32_t up = -side * 100;          /* 反対側へ */
+
+        CHECK(wr32(0x40, (uint32_t)(1000 + dn)) == RESULT_REJECTED);   /* MOVE_ABS: 目標 − 現在位置の符号 */
+        CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+        CHECK(wr32(0x44, (uint32_t)dn) == RESULT_REJECTED);
+        CHECK(wr32(0x48, (uint32_t)dn) == RESULT_REJECTED);
+        CHECK(g_calls_n == 0u);                  /* 何も実行していない */
+
+        CHECK(wr32(0x40, (uint32_t)(1000 + up)) == RESULT_OK);
+        CHECK(g_to == 1000 + up);
+        CHECK(wr32(0x44, (uint32_t)up) == RESULT_OK);
+        CHECK(g_by == up);
+        CHECK(wr32(0x48, (uint32_t)up) == RESULT_OK);
+        CHECK(g_run == up);
+
+        /* 方向のない指令（現在位置への MOVE_ABS、0 の MOVE_REL、停止指令の RUN_SPEED=0）は受け付ける */
+        CHECK(wr32(0x40, 1000) == RESULT_OK);
+        CHECK(wr32(0x44, 0) == RESULT_OK);
+        CHECK(wr32(0x48, 0) == RESULT_OK);
+        CHECK(g_run == 0);
+    }
+    /* モード 0 では入力が作動レベルでも拒否しない */
+    to_home_ready(false);
+    CHECK(wr8(0x59, 0) == RESULT_OK);
+    home_pins(true, true);
+    tick1(3);
+    CHECK(wr32(0x40, 100) == RESULT_OK);
+    CHECK(wr32(0x48, (uint32_t)-100) == RESULT_OK);
+}
+
+/* MOVE_ABS の方向は停止中の現在位置との差。負の位置・32bit の端でも符号を誤らない */
+static void test_move_abs_direction_uses_position(void)
+{
+    to_home_ready(false);
+    g_pos = -500;
+    home_pins(false, true);                      /* HOME2（− 側）作動 */
+    tick1(3);
+    CHECK(wr32(0x40, (uint32_t)-501) == RESULT_REJECTED);   /* −500 → −501 は − 方向 */
+    CHECK(wr32(0x40, (uint32_t)-499) == RESULT_OK);          /* + 方向 */
+    CHECK(wr32(0x40, 0) == RESULT_OK);
+    g_pos = INT32_MAX - 5;
+    home_pins(true, false);                      /* HOME1（+ 側）作動 */
+    tick1(3);
+    CHECK(wr32(0x40, (uint32_t)INT32_MAX) == RESULT_REJECTED);
+    CHECK(wr32(0x40, (uint32_t)INT32_MIN) == RESULT_OK);
+    g_pos = INT32_MIN + 5;
+    home_pins(false, true);
+    tick1(3);
+    CHECK(wr32(0x40, (uint32_t)INT32_MIN) == RESULT_REJECTED);
+    CHECK(wr32(0x40, (uint32_t)INT32_MAX) == RESULT_OK);
+}
+
+/* ジョグ（SWITCH1 = +、SWITCH2 = −）: 作動中のリミット側は CMD_RESULT=1 で動かさない。反対側は動かす */
+static void test_jog_at_limit(void)
+{
+    /* HOME1（+ 側）作動中の SWITCH1（+）は拒否 */
+    to_home_ready(false);
+    home_pins(true, false);
+    tick1(3);
+    CHECK(wr16(0x5A, 800) == RESULT_OK);         /* CMD_RESULT を 0 にしておく */
+    g_sw1 = true;
+    tick1(1);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+    CHECK(strchr(g_calls, 'R') == NULL);
+    CHECK(wr16(0x5A, 800) == RESULT_OK);
+    tick1(3);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_OK);       /* 押している間、毎 tick 結果を上書きしない */
+    g_sw1 = false;
+    tick1(2);
+    CHECK(strchr(g_calls, 'S') == NULL);         /* 動かしていないので離しても停止指令は出さない */
+
+    /* 同じ状態で SWITCH2（−）は動く */
+    g_sw2 = true;
+    tick1(1);
+    CHECK(strchr(g_calls, 'R') != NULL);
+    CHECK(g_run == -1600);
+    g_sw2 = false;
+    tick1(1);
+    CHECK(strchr(g_calls, 'S') != NULL);         /* 離すと減速停止 */
+
+    /* HOME2（− 側）作動中の SWITCH2（−）は拒否、SWITCH1（+）は動く */
+    to_home_ready(false);
+    home_pins(false, true);
+    tick1(3);
+    CHECK(wr16(0x5A, 800) == RESULT_OK);
+    g_sw2 = true;
+    tick1(1);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+    CHECK(strchr(g_calls, 'R') == NULL);
+    g_sw2 = false;
+    tick1(1);
+    g_sw1 = true;
+    tick1(1);
+    CHECK(g_run == 1600);
+    g_sw1 = false;
+    tick1(1);
+}
+
+/* INPUT_STATUS bit5 は次に受け付けた移動指令で 0。拒否された指令・停止指令では 0 にならない（FR-HOME-03・04） */
+static void test_limit_flag_cleared_by_accepted_move(void)
+{
+    for (int cmd = 0; cmd < 5; cmd++) {
+        to_home_ready(false);
+        g_pos = 0;
+        g_running = true;
+        g_dir = 1;
+        home_pins(true, false);
+        tick1(3);
+        CHECK((rd8(R_INPUT) & 0x20) != 0);       /* リミット停止 */
+        g_running = false;
+
+        CHECK(wr32(0x44, 10) == RESULT_REJECTED); /* 拒否された指令では消えない */
+        CHECK((rd8(R_INPUT) & 0x20) != 0);
+        CHECK(wr32(0x48, 0) == RESULT_OK);        /* 停止指令（RUN_SPEED=0）も移動指令ではない */
+        CHECK((rd8(R_INPUT) & 0x20) != 0);
+        CHECK(wr8(0x50, CMD_STOP) == RESULT_OK);
+        CHECK((rd8(R_INPUT) & 0x20) != 0);
+
+        switch (cmd) {
+        case 0: CHECK(wr32(0x40, (uint32_t)-100) == RESULT_OK); break;   /* MOVE_ABS */
+        case 1: CHECK(wr32(0x44, (uint32_t)-100) == RESULT_OK); break;   /* MOVE_REL */
+        case 2: CHECK(wr32(0x48, (uint32_t)-100) == RESULT_OK); break;   /* RUN_SPEED */
+        case 3:                                                           /* ジョグ（SWITCH2） */
+            g_sw2 = true;
+            tick1(1);
+            g_sw2 = false;
+            break;
+        default:                                                          /* 入力が解除されたあとの + 方向の指令 */
+            home_pins(false, false);
+            tick1(3);
+            CHECK(wr32(0x44, 100) == RESULT_OK);
+            break;
+        }
+        CHECK((rd8(R_INPUT) & 0x20) == 0);
+    }
+}
+
+/* bit5=1 の状態で原点復帰を受け付けると bit5 が 0 になる。拒否された原点復帰では消えない */
+static void test_home_start_clears_limit_flag(void)
+{
+    for (int side = 1; side >= -1; side -= 2) {
+        to_home_ready(true);
+        g_running = true;
+        g_dir = (int8_t)side;
+        home_pins(side > 0, side < 0);
+        tick1(3);
+        CHECK((rd8(R_INPUT) & 0x20) != 0);
+        g_running = false;
+        g_pending = true;                         /* 起動待ちがあると拒否される */
+        CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_REJECTED);
+        CHECK((rd8(R_INPUT) & 0x20) != 0);
+        g_pending = false;
+        CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_OK);
+        CHECK((rd8(R_INPUT) & 0x20) == 0);
+        CHECK((rd8(R_INPUT) & 0x04) != 0);
+    }
+}
+
+/* HOME_NEG / HOME_POS の受け付け条件: ENABLED・停止中・J10_MODE=2 のときだけ（FR-HOME-05） */
+static void test_home_command_conditions(void)
+{
+    for (uint8_t c = CMD_HOME_NEG; c <= CMD_HOME_POS; c++) {
+        /* DISABLED */
+        setup();
+        CHECK(wr8(0x59, 2) == RESULT_OK);
+        CHECK(wr8(0x50, c) == RESULT_REJECTED);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+        CHECK(rd8(R_INPUT) == 0);
+        /* ENABLED だが J10_MODE が 0 / 1 */
+        for (uint8_t m = 0; m <= 1; m++) {
+            to_home_ready(true);
+            CHECK(wr8(0x59, m) == RESULT_OK);
+            CHECK(wr8(0x50, c) == RESULT_REJECTED);
+            CHECK(rd8(R_INPUT) == 0);
+            CHECK(g_calls_n == 0u);
+        }
+        /* パルス出力中・起動待ち */
+        to_home_ready(true);
+        g_running = true;
+        CHECK(wr8(0x50, c) == RESULT_REJECTED);
+        g_running = false;
+        g_pending = true;
+        CHECK(wr8(0x50, c) == RESULT_REJECTED);
+        g_pending = false;
+        CHECK(g_calls_n == 0u);
+        /* 受け付ける */
+        CHECK(wr8(0x50, c) == RESULT_OK);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_OK);
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x04);    /* bit2=1、bit3=0、bit4=0 */
+        CHECK((rd8(R_STATUS) & 0x01) != 0);      /* MOVING */
+        CHECK(g_run == (c == CMD_HOME_POS ? 800 : -800));
+        /* 原点復帰中の再指令は受け付けない */
+        CHECK(wr8(0x50, CMD_HOME_NEG) == RESULT_REJECTED);
+        CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_REJECTED);
+    }
+    /* FAULT 中 */
+    setup();
+    CHECK(wr8(0x59, 2) == RESULT_OK);
+    CHECK(wr8(0x50, CMD_ENABLE) == RESULT_OK);
+    app_on_driver_fault_isr(DRV_FAULT_TSD);
+    tick1(1);
+    CHECK(rd8(R_STATE) == APP_FAULT);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_REJECTED);
+}
+
+/* HOME_SPEED は最高速度を超えるなら最高速度、START_SPEED は HOME_SPEED を超えるなら HOME_SPEED（FR-HOME-05） */
+static void test_home_speeds(void)
+{
+    to_home_ready(true);
+    CHECK(wr16(0x5A, 5000) == RESULT_OK);        /* 最高速度 3200 を超える */
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    CHECK(g_run == 3200);
+
+    to_home_ready(true);
+    CHECK(wr16(0x5A, 1500) == RESULT_OK);
+    CHECK(wr8(0x50, CMD_HOME_NEG) == RESULT_OK);
+    CHECK(g_run == -1500);
+
+    /* すでに作動中: 戻りは START_SPEED（200）。HOME_SPEED 100 より大きいので 100 に制限 */
+    to_home_ready(true);
+    CHECK(wr16(0x5A, 100) == RESULT_OK);
+    home_pins(true, false);
+    tick1(3);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    CHECK(g_run == -100);
+}
+
+/* 原点復帰の一連の動作（side = +1: HOME_POS・HOME1、side = -1: HOME_NEG・HOME2）。FR-HOME-05・06・07、試験 36 */
+static void run_home_sequence(int side)
+{
+    to_home_ready(true);
+    g_pos = 123;
+    CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_OK);
+    CHECK(g_run == side * 800);                   /* (1) 指定側へ HOME_SPEED */
+    CHECK((rd8(R_STATUS) & 0x01) != 0);           /* 起動待ちでも MOVING */
+    tick1(3);                                     /* 起動して移動中 */
+    CHECK(g_running && g_dir == side);
+    CHECK((rd8(R_STATUS) & 0x01) != 0);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);
+
+    /* (2) 指定側が作動（確定の tick）で即停止。bit5（リミット停止）は立てない */
+    g_pos = 123 + side * 400;
+    home_pins(side > 0, side < 0);
+    tick1(1);
+    CHECK(strcmp(g_calls, "R") == 0);
+    tick1(1);
+    CHECK(strcmp(g_calls, "RE") == 0);
+    CHECK(!g_running);
+    CHECK((rd8(R_INPUT) & 0x20) == 0);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);         /* まだ原点復帰中 */
+    CHECK((rd8(R_STATUS) & 0x01) != 0);           /* パルスが止まっている間も MOVING */
+
+    /* (3) 停止を確かめて反対方向へ START_SPEED（200） */
+    tick1(1);
+    CHECK(strcmp(g_calls, "RER") == 0);
+    CHECK(g_run == -side * 200);
+    CHECK((rd8(R_STATUS) & 0x01) != 0);
+    tick1(2);
+    CHECK(g_running && g_dir == -side);
+    g_pos = 123 + side * 380;                     /* まだ作動のまま動く */
+    tick1(3);
+    CHECK(strcmp(g_calls, "RER") == 0);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);
+
+    /* 非作動の確定の tick で即停止 */
+    g_pos = 123 + side * 360;
+    home_pins(false, false);
+    tick1(1);
+    CHECK(strcmp(g_calls, "RER") == 0);
+    tick1(1);
+    CHECK(strcmp(g_calls, "RERE") == 0);
+    CHECK(!g_running);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);
+
+    /* (4) POSITION を 0 にして完了: bit2=0、bit3=1 */
+    tick1(1);
+    CHECK(strcmp(g_calls, "REREP") == 0);
+    CHECK(g_setpos_arg == 0 && g_pos == 0);
+    CHECK((rd8(R_INPUT) & 0x3C) == 0x08);
+    CHECK((rd8(R_STATUS) & 0x01) == 0);
+    CHECK(rd8(R_CMD_RESULT) == RESULT_OK);
+    tick1(5);
+    CHECK(strcmp(g_calls, "REREP") == 0);         /* 完了後は何もしない */
+    CHECK((rd8(R_INPUT) & 0x3C) == 0x08);         /* bit3 は保持 */
+}
+
+static void test_home_sequence_pos(void) { run_home_sequence(+1); }
+static void test_home_sequence_neg(void) { run_home_sequence(-1); }
+
+/* 開始時にすでに指定側が作動中なら (3) から。非作動の確定で停止し POSITION=0 */
+static void test_home_start_while_active(void)
+{
+    for (int side = 1; side >= -1; side -= 2) {
+        to_home_ready(true);
+        g_pos = 77;
+        home_pins(side > 0, side < 0);
+        tick1(3);
+        CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_OK);
+        CHECK(strcmp(g_calls, "R") == 0);
+        CHECK(g_run == -side * 200);              /* 最初から反対方向へ START_SPEED */
+        tick1(3);
+        CHECK(g_running && g_dir == -side);
+        home_pins(false, false);
+        tick1(2);
+        CHECK(strcmp(g_calls, "RE") == 0);
+        tick1(1);
+        CHECK(strcmp(g_calls, "REP") == 0);
+        CHECK(g_pos == 0);
+        CHECK((rd8(R_INPUT) & 0x3C) == 0x08);
+    }
+}
+
+/* 新しい原点復帰を始めると bit3・bit4 が 0 になる（FR-HOME-06） */
+static void test_home_restart_clears_bits(void)
+{
+    run_home_sequence(+1);
+    CHECK((rd8(R_INPUT) & 0x08) != 0);
+    CHECK(wr8(0x50, CMD_HOME_NEG) == RESULT_OK);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);         /* bit3=0 */
+    CHECK(wr8(0x50, CMD_STOP) == RESULT_OK);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);         /* 失敗 bit4=1 */
+    g_running = g_pending = false;
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x04);         /* bit4=0 */
+}
+
+/* (1) の途中で反対側が作動 → 即停止して失敗（bit2=0、bit4=1） */
+static void test_home_fail_opposite(void)
+{
+    for (int side = 1; side >= -1; side -= 2) {
+        to_home_ready(true);
+        CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_OK);
+        tick1(3);
+        CHECK(g_running);
+        home_pins(side < 0, side > 0);            /* 反対側 */
+        tick1(2);
+        CHECK(strcmp(g_calls, "RE") == 0);
+        CHECK(!g_running);
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+        CHECK((rd8(R_STATUS) & 0x01) == 0);
+        CHECK(rd8(R_STATE) == APP_ENABLED);
+        tick1(5);
+        CHECK(strcmp(g_calls, "RE") == 0);        /* その後は何もしない */
+    }
+}
+
+/* (3) で 1 回転分（STEPS_PER_REV × MICROSTEP = 200 × 16 = 3200 step）動いても非作動にならない → 即停止して失敗 */
+static void test_home_fail_back_over_one_rev(void)
+{
+    for (int side = 1; side >= -1; side -= 2) {
+        to_home_ready(true);
+        g_pos = 5000;
+        home_pins(side > 0, side < 0);
+        tick1(3);
+        CHECK(wr8(0x50, side > 0 ? CMD_HOME_POS : CMD_HOME_NEG) == RESULT_OK);
+        tick1(3);
+        CHECK(g_running);
+        g_pos = 5000 - side * 3199;               /* 1 回転に満たない */
+        tick1(3);
+        CHECK(strcmp(g_calls, "R") == 0);
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x04);
+        g_pos = 5000 - side * 3200;               /* 1 回転分 */
+        tick1(1);
+        CHECK(strcmp(g_calls, "RE") == 0);
+        CHECK(!g_running);
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    }
+    /* MICROSTEP を変えると上限も変わる（200 × 1 = 200 step） */
+    to_home_ready(true);
+    CHECK(wr8(0x24, 1) == RESULT_OK);
+    g_pos = 0;
+    home_pins(true, false);
+    tick1(3);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    g_pos = -199;
+    tick1(2);
+    CHECK((rd8(R_INPUT) & 0x04) != 0);
+    g_pos = -200;
+    tick1(1);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+}
+
+/* STOP は従来どおり減速停止（stepper_stop）、ESTOP・DISABLE・FAULT は即停止。どれも bit2=0、bit4=1（FR-HOME-06） */
+static void test_home_abort_by_commands(void)
+{
+    /* STOP */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    CHECK(wr8(0x50, CMD_STOP) == RESULT_OK);
+    CHECK(strcmp(g_calls, "RS") == 0);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    CHECK((rd8(R_STATUS) & 0x01) != 0);           /* 減速中は stepper が出力中なので MOVING */
+    g_running = false;
+    tick1(3);
+    CHECK(strcmp(g_calls, "RS") == 0);            /* 中止後に再起動しない */
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+
+    /* ESTOP */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_NEG) == RESULT_OK);
+    tick1(3);
+    CHECK(wr8(0x50, CMD_ESTOP) == RESULT_OK);
+    CHECK(strcmp(g_calls, "RE") == 0);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    CHECK((rd8(R_STATUS) & 0x01) == 0);
+
+    /* ブロードキャストの STOP / ESTOP / DISABLE */
+    for (uint8_t c = CMD_DISABLE; c <= CMD_ESTOP; c++) {
+        to_home_ready(true);
+        CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+        tick1(3);
+        app_broadcast_command(c);
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+        g_running = false;
+    }
+
+    /* DISABLE */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    CHECK(wr8(0x50, CMD_DISABLE) == RESULT_OK);
+    CHECK(rd8(R_STATE) == APP_DISABLED);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    CHECK(strcmp(g_calls, "RE") == 0);
+
+    /* RUN_SPEED=0（減速停止の指令）も中止 */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    CHECK(wr32(0x48, 0) == RESULT_OK);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+}
+
+/* FAULT（LO 異常・VM 異常）で中止 */
+static void test_home_abort_by_fault(void)
+{
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(10);
+    CHECK(g_running);
+    app_on_driver_fault_isr(DRV_FAULT_OPD);
+    tick1(1);
+    CHECK(rd8(R_STATE) == APP_FAULT);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    CHECK(!g_running);
+    CHECK((rd8(R_STATUS) & 0x01) == 0);
+    tick1(5);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+
+    /* VM 異常（励磁中）→ FAULT でも中止 */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    g_vm_mv = 0;
+    tick10(2);
+    CHECK(rd8(R_STATE) == APP_FAULT);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    g_vm_mv = 24000;
+}
+
+/* 通信タイムアウト（FR-MON-09）で減速停止し、原点復帰も中止（FR-HOME-06） */
+static void test_home_abort_by_comm_timeout(void)
+{
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    CHECK(g_running);
+    CHECK(wr16(0x26, 100) == RESULT_OK);          /* comm_last_request_ms は 0 で固定 → すでに超過 */
+    tick1(1);
+    CHECK(strcmp(g_calls, "RS") == 0);            /* 減速停止 */
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x10);
+    g_running = false;
+    tick1(3);
+    CHECK(strcmp(g_calls, "RS") == 0);
+}
+
+/* 原点復帰中（各段の切り替えでパルスが止まる間も含む）は移動指令・ジョグ・「停止中のみ」の操作を拒否する */
+static void test_home_rejects_operations(void)
+{
+    for (int stage = 0; stage < 2; stage++) {
+        to_home_ready(true);
+        g_pos = 0;
+        CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+        tick1(3);
+        if (stage == 1) {
+            /* 指定側の作動で ESTOP した直後: パルスが止まっているが原点復帰中 */
+            home_pins(true, false);
+            tick1(2);
+            CHECK(!g_running && !g_pending);
+            CHECK((rd8(R_INPUT) & 0x04) != 0);
+        }
+        calls_clear();
+        CHECK(wr32(0x40, 100) == RESULT_REJECTED);
+        CHECK(wr32(0x40, (uint32_t)-100) == RESULT_REJECTED);
+        CHECK(wr32(0x44, 100) == RESULT_REJECTED);
+        CHECK(wr32(0x44, (uint32_t)-100) == RESULT_REJECTED);
+        CHECK(wr32(0x48, 500) == RESULT_REJECTED);
+        CHECK(wr32(0x48, (uint32_t)-500) == RESULT_REJECTED);
+        CHECK(g_calls_n == 0u);
+        CHECK((rd8(R_INPUT) & 0x04) != 0);        /* 拒否は原点復帰に影響しない */
+
+        g_sw1 = true;                             /* ジョグ */
+        tick1(1);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+        g_sw1 = false;
+        tick1(1);
+        g_sw2 = true;
+        tick1(1);
+        CHECK(rd8(R_CMD_RESULT) == RESULT_REJECTED);
+        g_sw2 = false;
+        tick1(1);
+        CHECK(strchr(g_calls, 'S') == NULL);      /* 拒否したジョグの解除で停止指令を出さない */
+
+        CHECK(wr8(0x59, 0) == RESULT_REJECTED);   /* J10_MODE */
+        CHECK(rd8(0x59) == 2);
+        CHECK(wr8(0x59, 1) == RESULT_REJECTED);
+        CHECK(wr32(0x4C, 5) == RESULT_REJECTED);  /* SET_POSITION */
+        CHECK(wr8(0x50, CMD_SYNC_POSITION) == RESULT_REJECTED);
+        CHECK(wr8(0x50, CMD_SAVE_SETTINGS) == RESULT_REJECTED);
+        CHECK(wr8(0x50, CMD_LOAD_SETTINGS) == RESULT_REJECTED);
+        CHECK(wr8(0x50, CMD_FACTORY_SETTINGS) == RESULT_REJECTED);
+        CHECK(wr8(0x50, CMD_RESET_ELEC_ANGLE) == RESULT_REJECTED);
+        CHECK(wr8(0x24, 8) == RESULT_REJECTED);   /* MICROSTEP */
+        CHECK(strchr(g_calls, 'P') == NULL);
+        CHECK(wr16(0x5A, 400) == RESULT_OK);      /* 設定値のうち停止中のみでないものは書ける */
+        CHECK((rd8(R_INPUT) & 0x1C) == 0x04);
+    }
+}
+
+/* 原点復帰の完了で POSITION を再定義するので、起動後に最初にセンサが有効になっても自動 SYNC しない（FR-HOME-07、FR-POS-09） */
+static void test_home_blocks_auto_sync(void)
+{
+    /* 対照: 動かしていなければ、センサが有効になった時点で自動 SYNC（stepper_set_position）する */
+    setup();
+    calls_clear();
+    g_pos_valid = true;
+    tick10(1);
+    CHECK(strchr(g_calls, 'P') != NULL);
+
+    /* 原点復帰を完了させてからセンサが有効になる → 自動 SYNC しない */
+    to_home_ready(true);
+    CHECK(wr8(0x50, CMD_HOME_POS) == RESULT_OK);
+    tick1(3);
+    home_pins(true, false);
+    tick1(2);
+    tick1(1);
+    tick1(3);
+    home_pins(false, false);
+    tick1(3);
+    CHECK((rd8(R_INPUT) & 0x1C) == 0x08);
+    CHECK(strcmp(g_calls, "REREP") == 0);
+    CHECK(g_touched);
+    g_pos_valid = true;
+    tick10(3);
+    CHECK(strcmp(g_calls, "REREP") == 0);         /* 追加の P（SYNC）なし */
+    CHECK(g_pos == 0);
+}
+
 int main(void)
 {
     printf("test_app: app.c register tests\n");
@@ -1202,6 +2065,31 @@ int main(void)
     RUN(test_agc_load_while_enabled);
     RUN(test_agc_before_wake);
     RUN(test_agc_does_not_change_fault_handling);
+    RUN(test_j10_applied_at_boot);
+    RUN(test_j10_mode_write_switches_pins);
+    RUN(test_enc_count_register);
+    RUN(test_input_status_bits);
+    RUN(test_input_status_glitch);
+    RUN(test_limit_stop_directions);
+    RUN(test_limit_stop_conditions);
+    RUN(test_move_rejected_at_limit);
+    RUN(test_move_abs_direction_uses_position);
+    RUN(test_jog_at_limit);
+    RUN(test_limit_flag_cleared_by_accepted_move);
+    RUN(test_home_start_clears_limit_flag);
+    RUN(test_home_command_conditions);
+    RUN(test_home_speeds);
+    RUN(test_home_sequence_pos);
+    RUN(test_home_sequence_neg);
+    RUN(test_home_start_while_active);
+    RUN(test_home_restart_clears_bits);
+    RUN(test_home_fail_opposite);
+    RUN(test_home_fail_back_over_one_rev);
+    RUN(test_home_abort_by_commands);
+    RUN(test_home_abort_by_fault);
+    RUN(test_home_abort_by_comm_timeout);
+    RUN(test_home_rejects_operations);
+    RUN(test_home_blocks_auto_sync);
 
     printf("%d checks, %d failed\n", g_checks, g_fail);
     return g_fail ? 1 : 0;

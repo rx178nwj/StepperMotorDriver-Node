@@ -38,6 +38,8 @@ int32_t stepper_position(void);
 bool stepper_set_position(int32_t pos);   /* 停止中のみ */
 int32_t stepper_speed(void);              /* 符号付き step/s */
 bool stepper_at_target(void);
+/* パルス出力中の進行方向: POSITION が増える = +1、減る = -1、停止中 = 0（FLAGS bit0 の方向反転とは無関係。FR-HOME-03） */
+int8_t stepper_motion_dir(void);
 
 /* 起動後に一度でもパルス出力を開始した、または stepper_set_position で位置を再定義したら true
  * （位置センサの自動同期の可否判断用。FR-POS-09） */

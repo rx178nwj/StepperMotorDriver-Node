@@ -41,6 +41,12 @@
 #define AD_IN_PORT       GPIOA   /* PA7 = ADC1_IN12 (J10.5) */
 #define AD_IN_PIN        GPIO_PIN_7
 
+/* ---- J10 の ENC/HOME 入力（J10_MODE で切り替え。3.12 節） ---- */
+#define J10_A_HOME1_PORT GPIOA   /* PA15 = ENC_A / HOME1（TIM2_CH1、AF1。リセット直後は JTDI） */
+#define J10_A_HOME1_PIN  GPIO_PIN_15
+#define J10_B_HOME2_PORT GPIOA   /* PA1  = ENC_B / HOME2（TIM2_CH2、AF1） */
+#define J10_B_HOME2_PIN  GPIO_PIN_1
+
 /* ---- 位置センサ AS5600（I2C1、J9） ---- */
 #define I2C_SENS_PORT    GPIOB   /* PB6 = I2C1_SCL, PB7 = I2C1_SDA（AF4、オープンドレイン、外付け 4.7k プルアップ） */
 #define I2C_SENS_SCL_PIN GPIO_PIN_6

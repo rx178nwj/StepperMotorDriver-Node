@@ -7,6 +7,8 @@
 
 GPIO_TypeDef g_gpioa, g_gpiob, g_gpioc, g_gpioh;
 TIM_TypeDef g_tim1;
+TIM_TypeDef g_tim2;
+int g_tim2_clk;
 I2C_TypeDef g_i2c1;
 DWT_TypeDef g_dwt;
 I2C_HandleTypeDef hi2c1;

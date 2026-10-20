@@ -3,6 +3,8 @@
 #include "comm.h"
 #include "config.h"
 #include "drv.h"
+#include "home.h"
+#include "j10.h"
 #include "monitor.h"
 #include "position.h"
 #include "settings.h"
@@ -40,9 +42,9 @@ static uint8_t sensor_status_snapshot; /* SENSOR_STATUS レジスタの値（10 
 static uint16_t shaft_angle_snapshot;  /* SHAFT_ANGLE レジスタの値（10 ms 周期。USB の名前表で公開） */
 
 static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID, .ad_in_mv = 0xFFFFu };
-/* J10（3.12 節）。入力と ENC は E3・E4 で実装するまで常に 0 */
-static uint8_t j10_input_status;   /* INPUT_STATUS レジスタ（0x1E） */
-static int32_t enc_count;          /* ENC_COUNT レジスタ（0x5C） */
+/* J10（3.12 節）。INPUT_STATUS レジスタ（0x1E）と ENC_COUNT（0x5C）は読み出しのたびに作る */
+static home_t home;                /* 原点復帰の状態機械（home.c） */
+static bool limit_stopped;         /* INPUT_STATUS bit5: リミットで停止した（次に受け付けた移動指令で 0） */
 
 static bool vm_ok;
 static uint32_t vm_good_ms;
@@ -58,6 +60,7 @@ static uint32_t idle_since;
 static uint32_t start_allowed_at;
 
 static int8_t jog_dir;
+static bool jog_rejected;   /* jog_dir のジョグはリミット・原点復帰中のため拒否した（動かしていない） */
 static bool chord_done;
 static uint32_t chord_since;
 
@@ -100,6 +103,7 @@ static void driver_sleep(void)
     drv_enable(false);
     agc_apply();   /* ENABLED 中の LOAD・FACTORY で変えた AGC は、EN=Low になったここで反映する */
     stepper_estop();
+    home_abort(&home);   /* FAULT・VM 異常による原点復帰の中止（FR-HOME-06） */
     drv_standby();
     drv_set_current_min();
     lo_armed = false;
@@ -110,6 +114,7 @@ static void enter_fault(uint8_t bits)
     driver_sleep();
     fault_bits |= bits;
     jog_dir = 0;
+    jog_rejected = false;
     state = APP_FAULT;
 }
 
@@ -141,9 +146,11 @@ static uint8_t cmd_disable(void)
         return RESULT_REJECTED;
     }
     stepper_estop();
+    home_abort(&home);   /* DISABLE による原点復帰の中止（FR-HOME-06） */
     drv_enable(false);
     agc_apply();   /* ENABLED 中の LOAD・FACTORY で変えた AGC は、EN=Low になったここで反映する */
     jog_dir = 0;
+    jog_rejected = false;
     state = APP_DISABLED;
     return RESULT_OK;
 }
@@ -168,7 +175,7 @@ static uint8_t cmd_clear_fault(void)
 
 static uint8_t cmd_reset_angle(void)
 {
-    if (!drv_is_awake() || stepper_is_running()) {
+    if (!drv_is_awake() || stepper_is_running() || home_is_active(&home)) {
         return RESULT_REJECTED;
     }
     drv_pulse_reset();
@@ -181,7 +188,7 @@ static void apply_settings(void);
 /* SYNC_POSITION（FR-POS-06）。POSITION をセンサの出力軸角度から設定する */
 static uint8_t cmd_sync_position(void)
 {
-    if (stepper_is_running()) {
+    if (stepper_is_running() || home_is_active(&home)) {
         return RESULT_REJECTED;
     }
     if (!position_valid()) {
@@ -235,19 +242,92 @@ static uint8_t cmd_load(bool factory)
     return RESULT_OK;
 }
 
+/* ---------------------------------------------------------------- 原点・リミット（3.12.3 節） */
+
+/* J10_MODE=2 で、dir 方向（＋1 = HOME1 側、−1 = HOME2 側）のリミットが作動中か。dir=0 は常に false */
+static bool limit_active(int dir)
+{
+    if (cfg.j10_mode != J10_MODE_HOME) {
+        return false;
+    }
+    return dir > 0 ? j10_home1_active() : (dir < 0 ? j10_home2_active() : false);
+}
+
+/* 移動指令・ジョグを受け付けてよいか（FR-HOME-04、FR-HOME-06）。dir は移動方向（POSITION の増減。0 = 動かさない） */
+static bool move_allowed(int dir)
+{
+    return !home_is_active(&home) && !limit_active(dir);
+}
+
+static int sign32(int64_t v)
+{
+    return v > 0 ? 1 : (v < 0 ? -1 : 0);
+}
+
+static home_in_t home_inputs(void)
+{
+    home_in_t in = {
+        .home1 = j10_home1_active(),
+        .home2 = j10_home2_active(),
+        .moving = stepper_is_running() || stepper_has_pending(),
+        .position = stepper_position(),
+    };
+    return in;
+}
+
+static void home_apply(home_out_t o)
+{
+    switch (o.action) {
+    case HOME_ACT_RUN:
+        stepper_run(o.speed);
+        break;
+    case HOME_ACT_ESTOP:
+        stepper_estop();
+        break;
+    case HOME_ACT_SET_ZERO:
+        /* 原点復帰の完了で POSITION を再定義する。SET_POSITION と同じく自動 SYNC の対象外になる（FR-HOME-07） */
+        if (!stepper_set_position(0)) {
+            home_abort(&home);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* HOME_NEG（side = -1）・HOME_POS（side = +1）（FR-HOME-05） */
+static uint8_t cmd_home(int8_t side)
+{
+    if (state != APP_ENABLED || !motion_idle() || cfg.j10_mode != J10_MODE_HOME) {
+        return RESULT_REJECTED;
+    }
+    home_params_t p = {
+        .home_speed = cfg.home_speed,
+        .max_speed = cfg.max_speed,
+        .start_speed = cfg.start_speed,
+        .limit_steps = (uint32_t)cfg.steps_per_rev * cfg.microstep,
+    };
+    home_in_t in = home_inputs();
+    home_apply(home_start(&home, side, &p, &in));
+    limit_stopped = false;   /* 原点復帰も移動指令の一種: 古いリミット停止の bit5 を残さない */
+    return RESULT_OK;
+}
+
 static uint8_t command(uint8_t c)
 {
     switch (c) {
     case CMD_ENABLE:           return cmd_enable();
     case CMD_DISABLE:          return cmd_disable();
-    case CMD_STOP:             stepper_stop(); return RESULT_OK;
-    case CMD_ESTOP:            stepper_estop(); return RESULT_OK;
+    case CMD_STOP:             stepper_stop(); home_abort(&home); return RESULT_OK;
+    case CMD_ESTOP:            stepper_estop(); home_abort(&home); return RESULT_OK;
     case CMD_CLEAR_FAULT:      return cmd_clear_fault();
     case CMD_RESET_ELEC_ANGLE: return cmd_reset_angle();
     case CMD_SAVE_SETTINGS:    return cmd_save();
     case CMD_LOAD_SETTINGS:    return cmd_load(false);
     case CMD_FACTORY_SETTINGS: return cmd_load(true);
     case CMD_SYNC_POSITION:    return cmd_sync_position();
+    case CMD_HOME_NEG:         return cmd_home(-1);
+    case CMD_HOME_POS:         return cmd_home(1);
     default:                   return RESULT_INVALID;
     }
 }
@@ -278,9 +358,10 @@ static const reg_def_t writable[] = {
     {0x54, 2}, {0x56, 2}, {0x58, 1}, {0x59, 1}, {0x5A, 2},
 };
 
+/* 停止中（パルス出力なし、起動待ちなし、原点復帰中でない）。各段の切り替えで一瞬パルスが止まる原点復帰中も含めない */
 static bool motion_idle(void)
 {
-    return !stepper_is_running() && !stepper_has_pending();
+    return !stepper_is_running() && !stepper_has_pending() && !home_is_active(&home);
 }
 
 /* 設定をドライバ・プランナへ反映（何度呼んでもよい） */
@@ -288,7 +369,7 @@ static void apply_settings(void)
 {
     apply_stepper_params();
     position_pa7_set(cfg.pa7_mode, (cfg.flags & SETTINGS_FLAG_SENSOR_DIR) != 0);
-    /* TODO(E3): J10_MODE に合わせて PA15/PA1 の端子を切り替える */
+    j10_set_mode(cfg.j10_mode);   /* J10_MODE に合わせて PA15/PA1 を切り替える（同じモードなら何もしない） */
     /* AGC は EN=Low の間だけ端子へ出す。ENABLED 中（LOAD・FACTORY のみここへ来る）は RAM の設定だけ変え、
      * 端子は次に EN=Low になったとき（cmd_disable・driver_sleep）に agc_apply で反映する */
     if (state != APP_ENABLED) {
@@ -348,19 +429,37 @@ static uint8_t write_setting(uint8_t addr, const uint8_t *p)
 static uint8_t write_reg(uint8_t addr, const uint8_t *p)
 {
     switch (addr) {
-    case 0x40:
-        if (state != APP_ENABLED) return RESULT_REJECTED;
-        stepper_move_to((int32_t)rd32(p));
+    case 0x40: {
+        int32_t target = (int32_t)rd32(p);
+        /* 方向は目標位置と現在位置の差で決める（FR-HOME-04） */
+        if (state != APP_ENABLED || !move_allowed(sign32((int64_t)target - stepper_position()))) return RESULT_REJECTED;
+        stepper_move_to(target);
+        limit_stopped = false;
         return RESULT_OK;
-    case 0x44:
-        if (state != APP_ENABLED) return RESULT_REJECTED;
-        stepper_move_by((int32_t)rd32(p));
+    }
+    case 0x44: {
+        int32_t delta = (int32_t)rd32(p);
+        if (state != APP_ENABLED || !move_allowed(sign32(delta))) return RESULT_REJECTED;
+        stepper_move_by(delta);
+        limit_stopped = false;
         return RESULT_OK;
-    case 0x48:
-        if (state != APP_ENABLED) return RESULT_REJECTED;
-        stepper_run((int32_t)rd32(p));
+    }
+    case 0x48: {
+        int32_t speed = (int32_t)rd32(p);
+        if (speed == 0) {
+            /* 0 は停止指令なので、原点復帰中・リミット作動中でも受け付ける（移動指令ではないので bit5 も変えない） */
+            if (state != APP_ENABLED) return RESULT_REJECTED;
+            stepper_run(0);
+            home_abort(&home);   /* 減速停止なので STOP と同じく原点復帰を中止する */
+            return RESULT_OK;
+        }
+        if (state != APP_ENABLED || !move_allowed(sign32(speed))) return RESULT_REJECTED;
+        stepper_run(speed);
+        limit_stopped = false;
         return RESULT_OK;
+    }
     case 0x4C:
+        if (home_is_active(&home)) return RESULT_REJECTED;
         return stepper_set_position((int32_t)rd32(p)) ? RESULT_OK : RESULT_REJECTED;
     case 0x50:
         return command(p[0]);
@@ -400,7 +499,7 @@ void app_broadcast_command(uint8_t cmd)
 static uint8_t status_bits(void)
 {
     uint8_t s = 0;
-    if (stepper_is_running())                      s |= 1u << 0;
+    if (stepper_is_running() || home_is_active(&home)) s |= 1u << 0;   /* 原点復帰中は各段の切り替えでパルスが止まる間も 1 */
     /* bit1 は予約（常に 0。MO は廃止） */
     if (board_pwr_external())                      s |= 1u << 2;
     if (ui_sw1())                                  s |= 1u << 3;
@@ -415,6 +514,19 @@ static uint8_t sensor_status_bits(void)
 {
     uint8_t s = position_status_bits();
     if (sensor_synced) s |= 1u << 4;
+    return s;
+}
+
+/* INPUT_STATUS（0x1E）。bit0〜1 は J10_MODE=2 のときだけ確定した作動状態（それ以外は j10 が false を返す） */
+static uint8_t input_status_bits(void)
+{
+    uint8_t s = 0;
+    if (j10_home1_active())     s |= 1u << 0;
+    if (j10_home2_active())     s |= 1u << 1;
+    if (home_is_active(&home))  s |= 1u << 2;
+    if (home_is_done(&home))    s |= 1u << 3;
+    if (home_is_failed(&home))  s |= 1u << 4;
+    if (limit_stopped)          s |= 1u << 5;
     return s;
 }
 
@@ -441,7 +553,7 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     m[0x19] = sensor_status_bits();
     wr16(&m[0x1A], position_raw());
     wr16(&m[0x1C], position_shaft_angle(position_raw(), cfg.sensor_offset));
-    m[0x1E] = j10_input_status;
+    m[0x1E] = input_status_bits();
     /* 0x1F は予約（0） */
     wr16(&m[0x20], cfg.run_current_ma);
     wr16(&m[0x22], cfg.hold_current_ma);
@@ -460,7 +572,7 @@ void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out)
     m[0x58] = cfg.pa7_mode;
     m[0x59] = cfg.j10_mode;
     wr16(&m[0x5A], cfg.home_speed);
-    wr32(&m[0x5C], (uint32_t)enc_count);
+    wr32(&m[0x5C], (uint32_t)j10_enc_count());
 
     for (uint32_t i = 0; i < len; i++) {
         uint32_t a = (uint32_t)reg + i;
@@ -478,8 +590,9 @@ static void handle_switches(void)
     if (s1 && s2) {
         /* 同時長押し: FAULT → 解除、DISABLED ⇔ ENABLED */
         if (jog_dir != 0) {
-            stepper_stop();
+            if (!jog_rejected) stepper_stop();
             jog_dir = 0;
+            jog_rejected = false;
         }
         if (!chord_done && (now - chord_since) >= CHORD_HOLD_MS) {
             chord_done = true;
@@ -505,12 +618,20 @@ static void handle_switches(void)
     if (d == jog_dir) {
         return;
     }
+    bool rejected = false;
     if (d != 0 && state == APP_ENABLED && (cfg.flags & FLAG_LOCAL_JOG)) {
-        stepper_run(d * (int32_t)cfg.jog_speed);
-    } else if (jog_dir != 0) {
+        if (move_allowed(d)) {
+            stepper_run(d * (int32_t)cfg.jog_speed);
+            limit_stopped = false;
+        } else {
+            cmd_result = RESULT_REJECTED;   /* 作動中のリミット側・原点復帰中のジョグは動かさない（FR-HOME-04） */
+            rejected = true;
+        }
+    } else if (jog_dir != 0 && !jog_rejected) {
         stepper_stop();
     }
     jog_dir = d;
+    jog_rejected = rejected;
 }
 
 static void handle_motion(void)
@@ -530,7 +651,7 @@ static void handle_motion(void)
         }
     }
 
-    if (stepper_is_running() || pending) {
+    if (stepper_is_running() || pending || home_is_active(&home)) {
         idle_since = now;
     } else if (!hold_active && (now - idle_since) >= cfg.hold_delay_ms) {
         drv_set_current_ma(cfg.hold_current_ma, mon.vdda_mv);
@@ -538,9 +659,32 @@ static void handle_motion(void)
     }
 
     /* 通信タイムアウト（ジョグ中は対象外） */
-    if (cfg.comm_timeout_ms != 0 && jog_dir == 0 && (stepper_is_running() || pending) &&
+    if (cfg.comm_timeout_ms != 0 && (jog_dir == 0 || jog_rejected) && (stepper_is_running() || pending) &&
         (int32_t)(now - comm_last_request_ms()) > (int32_t)cfg.comm_timeout_ms) {
         stepper_stop();
+        home_abort(&home);   /* 通信タイムアウトによる原点復帰の中止（FR-HOME-06）。停止は減速停止 */
+    }
+}
+
+/* J10 の HOME 入力（1 ms 周期）。確定したレベルを更新する。handle_motion より前に呼ぶ */
+static void handle_j10_input(void)
+{
+    j10_poll_1ms((cfg.flags & SETTINGS_FLAG_HOME_ACTIVE_HIGH) != 0);
+}
+
+/* リミット停止（FR-HOME-03）と原点復帰の状態機械（FR-HOME-05・06）。handle_motion の後に呼ぶ（同じ tick で起動した直後も止められる） */
+static void handle_limit_and_home(void)
+{
+    if (home_is_active(&home)) {
+        /* 原点復帰中の停止は状態機械が行う（指定側の作動で止まるのは通常動作なので bit5 は立てない） */
+        home_in_t in = home_inputs();
+        home_apply(home_step(&home, &in));
+        return;
+    }
+    int8_t d = stepper_motion_dir();
+    if (d != 0 && limit_active(d)) {
+        stepper_estop();      /* 励磁は維持、FAULT にはしない */
+        limit_stopped = true;
     }
 }
 
@@ -598,9 +742,17 @@ void app_init(void)
         cfg = t;
     }
     apply_stepper_params();
+    home_init(&home);
+    limit_stopped = false;
+    jog_rejected = false;
+    sensor_synced = false;
+    sensor_auto_done = false;
     position_init();
     /* PA7 は設定を読み込んでから保存されたモードにする（それまではアナログ入力。FR-POS-11） */
     position_pa7_set(cfg.pa7_mode, (cfg.flags & SETTINGS_FLAG_SENSOR_DIR) != 0);
+    /* J10 は設定を読み込んでから保存されたモードにする（それまではリセット時の状態のまま。FR-J10-01） */
+    j10_init();
+    j10_set_mode(cfg.j10_mode);
     comm_init(board_id);   /* CAN_S は board_init で Low 済み（FR-COM-14） */
     state = APP_NO_VM;
 }
@@ -609,6 +761,7 @@ void app_tick_1ms(uint32_t now_ms)
 {
     now = now_ms;
     handle_driver_fault();
+    handle_j10_input();
 
     comm_poll();
 
@@ -616,6 +769,7 @@ void app_tick_1ms(uint32_t now_ms)
     status_snapshot = status_bits();
     handle_switches();
     handle_motion();
+    handle_limit_and_home();
 
     ui_view_t v = {
         .enabled = state == APP_ENABLED,

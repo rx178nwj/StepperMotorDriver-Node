@@ -13,6 +13,9 @@
 typedef struct {
     uint32_t BSRR;   /* 最後に書いた値（テストが読む） */
     uint32_t IDR;    /* テストが設定する入力レベル */
+    uint32_t MODER;  /* j10.c が直接設定する（00 入力、01 出力、10 AF、11 アナログ） */
+    uint32_t PUPDR;  /* 00 なし、01 プルアップ、10 プルダウン */
+    uint32_t AFR[2]; /* 代替機能（1 ピン 4 ビット） */
 } GPIO_TypeDef;
 
 typedef struct {
@@ -56,11 +59,24 @@ void HAL_GPIO_Init(GPIO_TypeDef *port, GPIO_InitTypeDef *init);
 
 /* ---- TIM1 ---- */
 typedef struct {
-    uint32_t CR1, CR2, DIER, SR, EGR, CCMR1, CCER, CNT, PSC, ARR, RCR, CCR1, BDTR;
+    uint32_t CR1, CR2, SMCR, DIER, SR, EGR, CCMR1, CCER, CNT, PSC, ARR, RCR, CCR1, BDTR;
 } TIM_TypeDef;
 
 extern TIM_TypeDef g_tim1;
 #define TIM1 (&g_tim1)
+
+/* ---- TIM2（j10.c のエンコーダモード）。クロックの有効・無効は g_tim2_clk に記録する ---- */
+extern TIM_TypeDef g_tim2;
+extern int g_tim2_clk;
+#define TIM2 (&g_tim2)
+#define __HAL_RCC_TIM2_CLK_ENABLE()   (g_tim2_clk = 1)
+#define __HAL_RCC_TIM2_CLK_DISABLE()  (g_tim2_clk = 0)
+#define TIM_SMCR_SMS_Pos   0u
+#define TIM_CCMR1_CC1S_Pos 0u
+#define TIM_CCMR1_IC1F_Pos 4u
+#define TIM_CCMR1_CC2S_Pos 8u
+#define TIM_CCMR1_IC2F_Pos 12u
+#define TIM_CCER_CC2E      (1u << 4)
 
 #define TIM_CR1_CEN        (1u << 0)
 #define TIM_CR1_URS        (1u << 2)

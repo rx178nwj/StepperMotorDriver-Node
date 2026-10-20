@@ -873,6 +873,80 @@ static void test_position_tracking(void)
     CHECK(stepper_position() == 5);
 }
 
+/* ---------------------------------------------------------------- FR-HOME-03: 進行方向（stepper_motion_dir） */
+
+/* POSITION が増える = +1、減る = -1、停止中 = 0。DIR 端子の反転（FLAGS bit0）とは無関係に POSITION の増減で決まる */
+static void test_motion_dir(void)
+{
+    sim_reset_default();
+    CHECK(stepper_motion_dir() == 0);                 /* 停止中 */
+
+    stepper_run(2000);
+    CHECK(stepper_motion_dir() == 0);                 /* 指令だけ（起動前）は 0 */
+    CHECK(sim_start());
+    sim_events(100);
+    int32_t p0 = stepper_position();
+    CHECK(stepper_motion_dir() == 1);
+    sim_events(10);
+    CHECK(stepper_position() > p0);                   /* +1 のとき POSITION は増える */
+    stepper_estop();
+    CHECK(stepper_motion_dir() == 0);                 /* ESTOP 後は 0 */
+
+    stepper_run(-2000);
+    CHECK(sim_start());
+    sim_events(100);
+    p0 = stepper_position();
+    CHECK(stepper_motion_dir() == -1);
+    sim_events(10);
+    CHECK(stepper_position() < p0);                   /* -1 のとき POSITION は減る */
+    stepper_stop();                                   /* 減速中も進行方向は変わらない */
+    sim_events(5);
+    CHECK(stepper_motion_dir() == -1);
+    sim_run_to_stop(100000);
+    CHECK(stepper_motion_dir() == 0);                 /* 止まったら 0 */
+
+    /* 位置決め: 終了後は 0、目標が後ろ側なら -1 */
+    sim_reset_default();
+    stepper_move_to(500);
+    CHECK(sim_start());
+    sim_events(10);
+    CHECK(stepper_motion_dir() == 1);
+    sim_run_to_stop(100000);
+    CHECK(stepper_position() == 500 && stepper_motion_dir() == 0);
+    stepper_move_by(-300);
+    CHECK(sim_start());
+    sim_events(10);
+    CHECK(stepper_motion_dir() == -1);
+    sim_run_to_stop(100000);
+    CHECK(stepper_position() == 200 && stepper_motion_dir() == 0);
+}
+
+/* invert_dir（FLAGS bit0）でも、POSITION が増えるときは +1、減るときは -1（DIR 端子のレベルは反転する） */
+static void test_motion_dir_with_invert(void)
+{
+    sim_reset(3200.0f, 16000.0f, 16000.0f, 200.0f, true);
+    stepper_run(1500);
+    CHECK(sim_start());
+    sim_events(50);
+    int32_t p0 = stepper_position();
+    CHECK(dir_is_ccw());                               /* 反転しているので DIR は CCW */
+    CHECK(stepper_motion_dir() == 1);                  /* それでも POSITION は増える方向 = +1 */
+    sim_events(10);
+    CHECK(stepper_position() > p0);
+    stepper_estop();
+
+    stepper_run(-1500);
+    CHECK(sim_start());
+    sim_events(50);
+    p0 = stepper_position();
+    CHECK(dir_is_cw());
+    CHECK(stepper_motion_dir() == -1);
+    sim_events(10);
+    CHECK(stepper_position() < p0);
+    stepper_estop();
+    CHECK(stepper_motion_dir() == 0);
+}
+
 int main(void)
 {
     RUN(test_make_period_widths);
@@ -894,6 +968,8 @@ int main(void)
     RUN(test_estop);
     RUN(test_speed_limits);
     RUN(test_position_tracking);
+    RUN(test_motion_dir);
+    RUN(test_motion_dir_with_invert);
 
     printf("\n%d checks, %d failed\n", g_checks, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -334,6 +334,12 @@ int32_t stepper_speed(void)
     return running ? (int32_t)cur_speed : 0;
 }
 
+int8_t stepper_motion_dir(void)
+{
+    /* dir は position += dir の向き。DIR 端子（FLAGS bit0 の反転）とは無関係 */
+    return running ? dir : 0;
+}
+
 bool stepper_at_target(void)
 {
     return mode == MODE_POS && !running && position == target_pos;

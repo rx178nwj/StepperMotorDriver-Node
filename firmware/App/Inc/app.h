@@ -32,6 +32,8 @@ typedef enum {
 #define CMD_LOAD_SETTINGS     8u   /* 保存済み設定へ戻す（停止中のみ） */
 #define CMD_FACTORY_SETTINGS  9u   /* 工場出荷値へ戻す（RAM のみ。保存は SAVE で） */
 #define CMD_SYNC_POSITION     10u  /* 位置センサの角度から POSITION を設定する（停止中のみ） */
+#define CMD_HOME_NEG          11u  /* − 側（HOME2）の原点復帰（ENABLED・停止中・J10_MODE=2 のみ） */
+#define CMD_HOME_POS          12u  /* ＋ 側（HOME1）の原点復帰 */
 
 /* CMD_RESULT レジスタ */
 #define RESULT_OK             0u

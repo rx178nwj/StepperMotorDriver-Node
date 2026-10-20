@@ -98,4 +98,13 @@
 #define POS_FAIL_LIMIT          3u           /* 連続失敗でセンサ無効 */
 #define POS_RETRY_MS            1000u        /* 無効の間の再接続周期 */
 
+/* ---- J10（PA15/PA1）の ENC・HOME 入力（要求仕様 3.12 節）---- */
+/* ENC のデジタルフィルタ（TIM2_CCMR1 の IC1F/IC2F）。TIM2 は APB1 タイマクロック 80 MHz、CKD=00 で fDTS = 80 MHz。
+ * 0b1001 = fSAMPLING = fDTS/8（10 MHz）で 8 サンプル連続一致 → 0.8 µs 以上続いた変化だけを通す。
+ * 各相 200 kHz（FR-ENC-02）は 50% デューティで 1 レベルが 2.5 µs、A/B の位相差 1.25 µs なので、
+ * フィルタの遅延（0.8 µs）は両相に同じにかかって位相関係を保ち、2.5 µs の幅は通る（余裕約 3 倍）。
+ * 0.8 µs 未満のノイズは除く。0b1011（fDTS/16、8 サンプル）は 1.6 µs で 200 kHz の余裕が小さいため使わない */
+#define ENC_FILTER_ICF          0x9u
+#define HOME_CONFIRM_SAMPLES    2u           /* HOME 入力の確定に必要な連続一致回数（1 ms 周期。FR-HOME-02） */
+
 #endif /* CONFIG_H */
