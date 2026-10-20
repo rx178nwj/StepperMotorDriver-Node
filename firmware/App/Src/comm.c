@@ -200,6 +200,9 @@ void comm_poll(void)
 
 void comm_notify_fault(uint8_t state, uint8_t fault)
 {
+    if (fault_pending) {
+        comm_stats.tx_dropped++;   /* 未送信の異常通知を新しい通知で上書きする（FR-COM-12） */
+    }
     comm_make_fault_frame(state, fault, &fault_frame);
     fault_pending = true;
     if (can_try_send(&fault_frame)) {

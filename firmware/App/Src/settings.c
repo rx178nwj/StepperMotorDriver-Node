@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 
-/* リンカスクリプト stm32l433cc_app.ld で FLASH を 252K にして確保した領域 */
+/* リンカスクリプト STM32L433xx_app.ld で FLASH を 252K にして確保した領域 */
 #define NV_BASE        0x0803F000u
 #define NV_FIRST_PAGE  126u
 #define NV_PAGES       2u

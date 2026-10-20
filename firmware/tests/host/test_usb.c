@@ -429,6 +429,37 @@ static void test_mem_ecc(void)
     short_up_expect(0x20000100u, 4, USB_ERR_OK, 2);            /* 次の読み出しは正常 */
 }
 
+/* 読み出しの途中で ECC が立つと、その後のアドレスを読まずに ERR 0x36 を返す（FR-USB-33） */
+static void test_mem_ecc_abort(void)
+{
+    reset();
+    connect();
+
+    /* 揃った領域：2 語目（0x20000104）で ECC → 3・4 語目は読まない */
+    g_ecc_addr = 0x20000105u;
+    unsigned r8 = g_rd8_calls, r32 = g_rd32_calls;
+    short_up_expect(0x20000100u, 16, USB_ERR_NO_RESOURCE, 1);
+    CHECK(g_rd32_calls - r32 == 2u);
+    CHECK(g_rd8_calls - r8 == 0u);
+
+    /* 先頭の端数（8bit）で ECC → 以降の 8bit・32bit は読まない */
+    g_ecc_addr = 0x20000102u;
+    r8 = g_rd8_calls;
+    r32 = g_rd32_calls;
+    short_up_expect(0x20000101u, 11, USB_ERR_NO_RESOURCE, 2);
+    CHECK(g_rd8_calls - r8 == 2u);
+    CHECK(g_rd32_calls - r32 == 0u);
+
+    /* 末尾の端数（8bit）で ECC → それより後ろは読まない */
+    g_ecc_addr = 0x20000105u;
+    r8 = g_rd8_calls;
+    r32 = g_rd32_calls;
+    short_up_expect(0x20000100u, 7, USB_ERR_NO_RESOURCE, 3);
+    CHECK(g_rd32_calls - r32 == 1u);   /* 0x20000100 の語 */
+    CHECK(g_rd8_calls - r8 == 2u);     /* 0x20000104・0x20000105 まで。0x20000106 は読まない */
+    g_ecc_addr = 0;
+}
+
 /* ---------------------------------------------------------------- 試験 20: 名前表 */
 
 static void test_symbols(void)
@@ -775,6 +806,7 @@ int main(void)
     RUN(test_mem_short_up);
     RUN(test_mem_denied);
     RUN(test_mem_ecc);
+    RUN(test_mem_ecc_abort);
     RUN(test_symbols);
     RUN(test_sym_upload);
     RUN(test_can_request);

@@ -67,11 +67,17 @@ bool usb_mem_allowed(uint32_t addr, uint32_t size)
 #define USB_MEM_RD32(a)  (*(volatile const uint32_t *)(uintptr_t)(a))
 #endif
 
-/* 4 バイト境界に揃った部分は 32bit 単位、端は 8bit で読む（FR-USB-32） */
+/*
+ * 4 バイト境界に揃った部分は 32bit 単位、端は 8bit で読む（FR-USB-32）。
+ * 読み出しごとに nv_ecc_error を確認し、立っていたら以降を読まずに中止する（FR-USB-33）。
+ */
 static void mem_copy(uint8_t *dst, uint32_t addr, uint32_t n)
 {
     while (n > 0u && (addr & 3u) != 0u) {
         *dst++ = USB_MEM_RD8(addr);
+        if (nv_ecc_error) {
+            return;
+        }
         addr++;
         n--;
     }
@@ -81,12 +87,18 @@ static void mem_copy(uint8_t *dst, uint32_t addr, uint32_t n)
         dst[1] = (uint8_t)(w >> 8);
         dst[2] = (uint8_t)(w >> 16);
         dst[3] = (uint8_t)(w >> 24);
+        if (nv_ecc_error) {
+            return;
+        }
         dst += 4;
         addr += 4u;
         n -= 4u;
     }
     while (n > 0u) {
         *dst++ = USB_MEM_RD8(addr);
+        if (nv_ecc_error) {
+            return;
+        }
         addr++;
         n--;
     }
@@ -94,7 +106,8 @@ static void mem_copy(uint8_t *dst, uint32_t addr, uint32_t n)
 
 /*
  * 許可済みアドレスから読む。Flash の書き込み途中ページを読んで ECC エラー（NMI）になった場合は
- * NMI ハンドラが nv_ecc_error を立てて戻るので、USB_ERR_NO_RESOURCE を返す（リセットしない。FR-USB-33）。
+ * NMI ハンドラが nv_ecc_error を立てて戻るので、その時点で読み出しを中止し、
+ * USB_ERR_NO_RESOURCE を返す（リセットしない。FR-USB-33）。
  * atomic = true なら割り込みを禁止してコピーする（8 バイト以下の変数用。禁止時間は 1 µs 以下、FR-USB-38）。
  */
 static uint8_t mem_read(uint8_t *dst, uint32_t addr, uint32_t size, bool atomic)

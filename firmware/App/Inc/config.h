@@ -6,7 +6,7 @@
 #define CONFIG_H
 
 #define FW_VERSION_MAJOR        0
-#define FW_VERSION_MINOR        3
+#define FW_VERSION_MINOR        4
 #define DEVICE_ID               0xA3
 
 /* ---- クロック ---- */
