@@ -1,4 +1,5 @@
 #include "usb_proto.h"
+#include "app.h"
 #include "config.h"
 #include "settings.h"
 #include "symtab.h"
@@ -254,6 +255,8 @@ static uint8_t tx_buf[FRAME_BUF_SIZE];     /* USB ミドルウェアが送り終
 static uint16_t tx_len;
 static tx_state_t tx_state;
 static uint32_t tx_t0;                     /* PENDING / INFLIGHT になった時刻 */
+
+static volatile bool boot_request;         /* ENTER_BOOTLOADER を受け付けた（app_main が取り出して移行する） */
 
 static bool pending_event;
 static comm_frame_t event_frame;
@@ -570,6 +573,14 @@ static uint8_t exec_command(const uint8_t *req, uint8_t len, uint8_t *out, uint8
     case USB_CMD_CAN_REQUEST:
         return cmd_can_request(req, len, out, dlen);
 
+    case USB_CMD_ENTER_BOOTLOADER:
+        /* 未接続（0x35）は上の共通処理。ここでは PARAM 長 → KEY → ENABLED の順に判定する（FR-BL-01・02） */
+        if (len != 6u) return USB_ERR_SYNTAX;
+        if (le32(&req[2]) != BOOT_KEY) return USB_ERR_RANGE;
+        if (app_get_state() == APP_ENABLED) return USB_ERR_DENIED;
+        boot_request = true;   /* ACK は通常どおり返る。移行は app_main_loop が送信完了を待ってから行う */
+        return USB_ERR_OK;
+
     default:
         return USB_ERR_UNKNOWN_CMD;
     }
@@ -619,6 +630,19 @@ static void send_pending_event(uint32_t now)
         pending_event = false;   /* 50 ms 送れなかったイベントは破棄 */
         tx_drop();
     }
+}
+
+bool usb_proto_take_bootloader_request(void)
+{
+    bool r = boot_request;
+    boot_request = false;
+    return r;
+}
+
+bool usb_proto_tx_idle(void)
+{
+    tx_service(HAL_GetTick());
+    return tx_state == TX_FREE;
 }
 
 void usb_proto_poll(void)

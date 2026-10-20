@@ -789,6 +789,90 @@ static void test_event_dropped_after_50ms(void)
 
 /* ---------------------------------------------------------------- main */
 
+/* ---------------------------------------------------------------- 試験 39: ENTER_BOOTLOADER */
+
+static const uint8_t *boot_req(uint8_t ctr, uint32_t key)
+{
+    uint8_t p[4];
+    put32le(p, key);
+    return req(USB_CMD_ENTER_BOOTLOADER, ctr, p, 4);
+}
+
+static void test_enter_bootloader(void)
+{
+    reset();
+    (void)usb_proto_take_bootloader_request();   /* 前のテストの要求が残っていても消す */
+
+    /* 未接続: 0x35。要求は立たない */
+    expect_err(boot_req(0x21, BOOT_KEY), USB_ERR_LOCKED, 0x21);
+    CHECK(!usb_proto_take_bootloader_request());
+
+    connect();
+
+    /* PARAM 長が 4 でない（0・3・5 バイト）: 0x31 */
+    expect_err(req(USB_CMD_ENTER_BOOTLOADER, 0x22, NULL, 0), USB_ERR_SYNTAX, 0x22);
+    uint8_t p5[5] = { 0x42, 0x4F, 0x4F, 0x54, 0x00 };
+    expect_err(req(USB_CMD_ENTER_BOOTLOADER, 0x23, p5, 3), USB_ERR_SYNTAX, 0x23);
+    expect_err(req(USB_CMD_ENTER_BOOTLOADER, 0x24, p5, 5), USB_ERR_SYNTAX, 0x24);
+    CHECK(!usb_proto_take_bootloader_request());
+
+    /* KEY 不一致: 0x32（上位 1 バイト違い、下位 1 バイト違い、0、バイト順違い） */
+    expect_err(boot_req(0x25, BOOT_KEY ^ 0x80000000u), USB_ERR_RANGE, 0x25);
+    expect_err(boot_req(0x26, BOOT_KEY ^ 0x00000001u), USB_ERR_RANGE, 0x26);
+    expect_err(boot_req(0x27, 0u), USB_ERR_RANGE, 0x27);
+    expect_err(boot_req(0x28, 0x424F4F54u), USB_ERR_RANGE, 0x28);
+    CHECK(!usb_proto_take_bootloader_request());
+
+    /* KEY が違うときは ENABLED 中でも 0x32（判定順: 長さ → KEY → ENABLED） */
+    g_app_state = APP_ENABLED;
+    expect_err(boot_req(0x29, 0u), USB_ERR_RANGE, 0x29);
+
+    /* ENABLED 中: 0x33。要求は立たない */
+    expect_err(boot_req(0x2A, BOOT_KEY), USB_ERR_DENIED, 0x2A);
+    CHECK(!usb_proto_take_bootloader_request());
+
+    /* NO_VM・DISABLED・FAULT: ACK（DATA なし）を返し、要求が立つ（1 回だけ取り出せる） */
+    static const app_state_t ok_states[] = { APP_NO_VM, APP_DISABLED, APP_FAULT };
+    for (unsigned i = 0; i < sizeof ok_states / sizeof ok_states[0]; i++) {
+        g_app_state = ok_states[i];
+        uint8_t ctr = (uint8_t)(0x30u + i);
+        expect_err(boot_req(ctr, BOOT_KEY), USB_ERR_OK, ctr);
+        CHECK(usb_proto_take_bootloader_request());
+        CHECK(!usb_proto_take_bootloader_request());
+    }
+
+    /* ENABLED 以外（受け付け済みの直後に ENABLED になっても、拒否した要求は残らない）。CTR のエコー */
+    g_app_state = APP_DISABLED;
+    expect_err(boot_req(0xFE, BOOT_KEY), USB_ERR_OK, 0xFE);
+    CHECK(usb_proto_take_bootloader_request());
+    expect_err(boot_req(0x00, BOOT_KEY), USB_ERR_OK, 0x00);
+    CHECK(usb_proto_take_bootloader_request());
+}
+
+/* 受け付けた ACK の送信完了待ち: 送信中は idle にならず、USB ミドルウェアの完了で idle になる */
+static void test_enter_bootloader_tx_idle(void)
+{
+    reset();
+    (void)usb_proto_take_bootloader_request();
+    CHECK(usb_proto_tx_idle());   /* 何も送っていない */
+    connect();
+    CHECK(!usb_proto_tx_idle());  /* CONNECT の応答が送信中 */
+    test_tx_complete();
+    CHECK(usb_proto_tx_idle());
+
+    uint8_t p[4];
+    put32le(p, BOOT_KEY);
+    feed_req(USB_CMD_ENTER_BOOTLOADER, 0x44, p, 4);
+    usb_proto_poll();
+    CHECK(g_sent_n >= 1u);
+    CHECK(usb_proto_take_bootloader_request());
+    CHECK(!usb_proto_tx_idle());  /* ACK は USB ミドルウェアが送信中 */
+    g_tick += 10u;
+    CHECK(!usb_proto_tx_idle());
+    test_tx_complete();
+    CHECK(usb_proto_tx_idle());   /* 完了 */
+}
+
 int main(void)
 {
     test_stubs_reset();
@@ -810,6 +894,8 @@ int main(void)
     RUN(test_symbols);
     RUN(test_sym_upload);
     RUN(test_can_request);
+    RUN(test_enter_bootloader);
+    RUN(test_enter_bootloader_tx_idle);
     RUN(test_tx_stuck_drops_request);
     RUN(test_tx_failure_drops_after_50ms);
     RUN(test_fault_event_only_when_connected);

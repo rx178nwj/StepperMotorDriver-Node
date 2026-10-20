@@ -8,6 +8,8 @@
 #include "app_main.h"
 #include "app.h"
 #include "board.h"
+#include "bootjump.h"
+#include "config.h"
 #include "drv.h"
 #include "monitor.h"
 #include "stepper.h"
@@ -48,6 +50,24 @@ void app_main_init(void)
     last_10ms = last_1ms;
 }
 
+/*
+ * ENTER_BOOTLOADER の実行（FR-BL-03）。戻らない。
+ * ACK の送信完了を最大 BOOT_TX_WAIT_MS 待つ（その間も IWDG を更新）→ ドライバを安全状態にする →
+ * 移行フラグを書いてソフトウェアリセット。リセット後は main() の先頭で bootjump_check が ROM へ飛ぶ。
+ * 待ち中は新しい要求（usb_proto_poll）も app_tick も動かさないので、ENABLE などは割り込めない
+ */
+static void bootloader_enter(void)
+{
+    uint32_t t0 = HAL_GetTick();
+    while (!usb_proto_tx_idle() && (HAL_GetTick() - t0) < BOOT_TX_WAIT_MS) {
+        HAL_IWDG_Refresh(&app_iwdg);
+    }
+    app_enter_safe_state();
+    __disable_irq();
+    bootjump_request();
+    NVIC_SystemReset();
+}
+
 void app_main_loop(void)
 {
     uint32_t t = HAL_GetTick();
@@ -60,6 +80,9 @@ void app_main_loop(void)
         app_tick_10ms(t);
     }
     usb_proto_poll();   /* USB の受信解析・応答・イベント送信（ブロックしない） */
+    if (usb_proto_take_bootloader_request()) {
+        bootloader_enter();
+    }
     HAL_IWDG_Refresh(&app_iwdg);
 }
 

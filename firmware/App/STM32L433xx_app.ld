@@ -247,6 +247,18 @@ SECTIONS
   PROVIDE( __bss_start = __tbss_start );
   PROVIDE( __bss_size = __bss_end - __bss_start );
 
+  /* リセットで初期化しない領域（FR-BL-04）。ブートローダ移行フラグを置く（bootjump.c）。
+   * .bss の外（_ebss より後）に置くので、スタートアップのゼロクリア（_sbss〜_ebss）の対象にならない。
+   * NOLOAD なので Flash に初期値を持たず、.data のコピーの対象にもならない。SRAM1（RAM）内 */
+  .noinit (NOLOAD) : ALIGN(4)
+  {
+    __noinit_start = .;
+    *(.noinit)
+    *(.noinit*)
+    . = ALIGN(4);
+    __noinit_end = .;
+  } >RAM
+
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack (NOLOAD) :
   {

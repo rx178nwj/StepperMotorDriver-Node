@@ -53,6 +53,7 @@ set(APP_SOURCES
     App/Src/app_irq.c
     App/Src/app_main.c
     App/Src/board.c
+    App/Src/bootjump.c
     App/Src/comm.c
     App/Src/drv.c
     App/Src/home.c

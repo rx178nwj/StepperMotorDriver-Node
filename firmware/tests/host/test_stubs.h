@@ -2,6 +2,7 @@
 #ifndef TEST_STUBS_H
 #define TEST_STUBS_H
 
+#include "app.h"
 #include "comm.h"
 #include "symtab.h"
 #include <stdbool.h>
@@ -34,6 +35,7 @@ extern uint8_t g_cr_dlc;
 extern uint8_t g_cr_data[8];
 extern uint8_t g_cr_resp_n;             /* comm_process_request が返す応答数（0 または 1） */
 extern comm_frame_t g_cr_resp;
+extern app_state_t g_app_state;         /* app_get_state の戻り値（既定 APP_DISABLED） */
 
 /* USB ミドルウェアの送信完了を模擬する（TxState = 0） */
 void test_tx_complete(void);

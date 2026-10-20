@@ -109,6 +109,16 @@ static void driver_sleep(void)
     lo_armed = false;
 }
 
+app_state_t app_get_state(void)
+{
+    return state;
+}
+
+void app_enter_safe_state(void)
+{
+    driver_sleep();
+}
+
 static void enter_fault(uint8_t bits)
 {
     driver_sleep();

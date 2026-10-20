@@ -53,6 +53,11 @@ uint8_t app_reg_write(uint8_t reg, const uint8_t *data, uint8_t len);
 void app_reg_read(uint8_t reg, uint8_t len, uint8_t *out);
 void app_broadcast_command(uint8_t cmd);
 
+/* 現在の状態（USB の ENTER_BOOTLOADER が ENABLED 中かを調べる、FR-BL-02） */
+app_state_t app_get_state(void);
+/* ブートローダ移行の直前: ドライバを安全状態にする（EN=Low、DMODE=000 スタンバイ、DAC 最小。FR-BL-03） */
+void app_enter_safe_state(void);
+
 void app_init(void);
 void app_tick_1ms(uint32_t now_ms);
 void app_tick_10ms(uint32_t now_ms);

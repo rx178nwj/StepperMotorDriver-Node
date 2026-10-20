@@ -73,8 +73,14 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     -o "$out\test_j10.exe"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# bootjump.c（移行フラグの判定。ROM へ飛ぶ部分は test_bootjump.c 内の偽物）
+& $cc @common @inc `
+    "$here\test_bootjump.c" "$app\Src\bootjump.c" `
+    -o "$out\test_bootjump.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $rc = 0
-foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings', 'test_comm', 'test_app', 'test_home', 'test_j10') {
+foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings', 'test_comm', 'test_app', 'test_home', 'test_j10', 'test_bootjump') {
     Write-Host "=== $t"
     & "$out\$t.exe"
     if ($LASTEXITCODE -ne 0) { $rc = $LASTEXITCODE }

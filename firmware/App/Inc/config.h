@@ -107,4 +107,9 @@
 #define ENC_FILTER_ICF          0x9u
 #define HOME_CONFIRM_SAMPLES    2u           /* HOME 入力の確定に必要な連続一致回数（1 ms 周期。FR-HOME-02） */
 
+/* ---- ブートローダ移行（要求仕様 3.13 節）---- */
+#define BOOT_FLAG_MAGIC         0xB007DF11u  /* 移行フラグ（.noinit の 32bit）。一致したときだけ ROM ブートローダへ移る */
+#define BOOT_KEY                0x544F4F42u  /* ENTER_BOOTLOADER の KEY（"BOOT"） */
+#define BOOT_TX_WAIT_MS         50u          /* ACK の送信完了を待つ上限 */
+
 #endif /* CONFIG_H */

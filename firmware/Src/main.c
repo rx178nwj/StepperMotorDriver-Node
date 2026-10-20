@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_main.h"
+#include "bootjump.h"
 
 /* USER CODE END Includes */
 
@@ -66,6 +67,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  bootjump_check();   /* ENTER_BOOTLOADER 後のリセットなら、IWDG・クロックの初期化前に ROM へ移る（FR-BL-04） */
 
   /* USER CODE END 1 */
 

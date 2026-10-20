@@ -2,6 +2,7 @@
  * usb_proto.c / symtab.c をホストで単体テストするためのスタブ群。
  */
 #include "test_stubs.h"
+#include "app.h"
 #include "settings.h"
 #include "usbd_cdc_if.h"
 #include <string.h>
@@ -78,6 +79,7 @@ uint8_t g_cr_dlc;
 uint8_t g_cr_data[8];
 uint8_t g_cr_resp_n;
 comm_frame_t g_cr_resp;
+app_state_t g_app_state;
 
 volatile bool nv_ecc_error;
 USBD_HandleTypeDef hUsbDeviceFS;
@@ -94,6 +96,7 @@ void test_stubs_reset(void)
     g_board_id = 3;
     g_cr_calls = 0;
     g_cr_resp_n = 0;
+    g_app_state = APP_DISABLED;
     memset(&g_cr_resp, 0, sizeof g_cr_resp);
     nv_ecc_error = false;
     cdc.TxState = 0;
@@ -162,6 +165,13 @@ uint32_t test_rd32(uint32_t addr)
     }
     return (uint32_t)test_pattern(addr) | ((uint32_t)test_pattern(addr + 1u) << 8) |
            ((uint32_t)test_pattern(addr + 2u) << 16) | ((uint32_t)test_pattern(addr + 3u) << 24);
+}
+
+/* ---------------------------------------------------------------- app.c の代わり */
+
+app_state_t app_get_state(void)
+{
+    return g_app_state;
 }
 
 /* ---------------------------------------------------------------- comm.c の代わり */

@@ -40,13 +40,14 @@
 #define USB_CMD_SYM_FIND      0x22u
 #define USB_CMD_SYM_UPLOAD    0x23u
 #define USB_CMD_CAN_REQUEST   0x40u
+#define USB_CMD_ENTER_BOOTLOADER 0x50u   /* PARAM [KEY u32] = BOOT_KEY。ROM ブートローダ（USB DFU）へ移る（FR-BL-01） */
 
 /* ERR（CCP のコードに合わせる） */
 #define USB_ERR_OK            0x00u
 #define USB_ERR_UNKNOWN_CMD   0x30u   /* 未定義コマンド */
 #define USB_ERR_SYNTAX        0x31u   /* BODY 長がコマンドの形式と合わない */
 #define USB_ERR_RANGE         0x32u   /* SIZE・INDEX・CAN_ID・DLC が範囲外 */
-#define USB_ERR_DENIED        0x33u   /* 読み出し許可領域外 */
+#define USB_ERR_DENIED        0x33u   /* 読み出し許可領域外、ENABLED 中の ENTER_BOOTLOADER */
 #define USB_ERR_LOCKED        0x35u   /* CONNECT していない */
 #define USB_ERR_NO_RESOURCE   0x36u   /* 名前なし、Flash ECC エラー */
 
@@ -80,6 +81,13 @@ void usb_proto_on_bus_event(void);
 /* FR-COM-10 の異常通知など、CAN に送るフレームを USB イベント（EVT=0x01）としても送る。
  * セッション接続中のみ。main ループから呼ぶ */
 void usb_proto_notify_can_frame(const comm_frame_t *f);
+
+/* ENTER_BOOTLOADER を受け付けていれば true を返して要求を下ろす（1 回だけ true）。main ループから呼ぶ（FR-BL-03） */
+bool usb_proto_take_bootloader_request(void);
+
+/* 送信が完全に終わった（キューが空で USB ミドルウェアの送信も完了）なら true。
+ * 呼ぶたびに送信状態を 1 回進める（新しい要求は処理しない）。ACK の送信完了待ちに使う */
+bool usb_proto_tx_idle(void);
 
 /* ---- 単体で試験できる部品 ---- */
 
