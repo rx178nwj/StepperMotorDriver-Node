@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 |---|---|
 | 対象要求 | [requirements.md](requirements.md) 6章 試験 1「電源投入時、EN/DMODE/DAC が安全状態であること」、FR-SYS-02、FR-DRV-05a、H-2 |
-| 対象 | SteppingMotorDriver_NEMA23（回路図 2026-10-11 版）、ファームウェア 0.2 |
+| 対象 | SteppingMotorDriver_NEMA23（回路図 2026-10-11 版）、ファームウェア 0.4 |
 | 測定器 | ロジックアナライザ（8ch 以上、10 MS/s 以上）、オシロスコープまたはアナログ入力付きロジアナ（VREF 用）、テスタ、電流計付き安定化電源（VM 用）、ST-LINK |
-| 版 | 0.1（2026-10-11） |
+| 版 | 0.2（2026-10-20：AGC を PB10/PB11 に修正、CAN_S の初期レベル確認を追加、FW 版を 0.4 に更新） |
 
 ---
 
@@ -19,7 +19,8 @@
 | DMODE0/1/2 | PB12/13/14 | 39/40/41 | **常に 000**（High パルスなし） | 同上（製品ファームの VM あり条件は 4.3 参照） |
 | RESET | PB15 | 45 | 常に Low | 同上 |
 | CLK | PA8 | 43 | 常に Low | 同上 |
-| AGC0/1 | PB8/PB9 | 1/2 | 常に Low | 同上（参考項目） |
+| AGC0/1 | PB10/PB11 | 1/2 | 常に Low | 同上（参考項目） |
+| CAN_S | PC15 | TJA1441AT S(8) | **常に Low**（ノーマルモード。FR-COM-14）。起動直後に Low になり、High にならないこと | `board_init()` 完了（マーカ 2）以降。それより前は MCU のリセット状態（浮いた入力）なので S の内部プルアップで High になり、判定しない |
 | VREF（DAC） | PA4 | 31/32 VREFB/A | **0.25 V 以下**で安定。DAC1 DOR1 = 0 | マーカ 3（`drv_init` 完了）以降 |
 | VREF（DAC） | PA4 | 31/32 | 判定しない（R32 未実装のため浮く。値は記録する） | マーカ 3 より前（H-2：EN が Low なら出力は出ない） |
 | モータ | — | — | 保持トルクなし（軸が手で回る）。VM 電流がロジック電源投入の前後で増えない | VM 投入中 |
@@ -75,7 +76,9 @@ CMake プリセットを選んでビルドする。出力は `build/<preset>/dri
 | 0 | EN（PA10）の ODR または IDR が High |
 | 1 | DMODE（PB12-14）のどれかが High |
 | 2 | RESET（PB15）が High |
-| 3 | AGC（PB8/PB9）のどれかが High |
+| 3 | AGC（PB10/PB11）のどれかが High |
+
+試験ファームの監視ループは CAN_S（PC15）を調べない。CAN_S の確認は、ロジアナ（空き ch）またはテスタで行う（4.1）。
 | 4 | CLK（PA8）のピンレベルが High |
 | 5 | DAC1 DOR1 ≠ 0 |
 | 6 | DAC1 CH1 が停止している |
@@ -119,7 +122,7 @@ LED 表示：
 
 - ドライバ制御信号は MCU 側ではなく IC1 側（または IC1 に近い点）で測る。IC1 が実際に受けるレベルを確認するため。
 - 測定点（TP 番号とネットの対応）が決まったら、この表に書き足す。
-- AGC0/1 は ch が足りなければテスタで定常値だけ確認する。
+- AGC0/1・CAN_S は ch が足りなければテスタで定常値だけ確認する。CAN_S は TJA1441AT S(8) のパッドまたは PC15 で測る（FR-COM-14 の起動直後の Low を波形で見る場合は、空き ch に接続し、マーカ 2 以降で Low になることを確認する）。
 
 ### 3.2 ロジアナ設定
 
@@ -157,11 +160,11 @@ LED 表示：
 3. 条件 C1 で電源を入れる。
 4. 取り込んだ波形で次を確認し、記録表（5章）に書く。
    1. D1（EN）が 3V3 立ち上がりから最後まで Low のままである。
-   2. D2〜D4（DMODE）・D5（CLK）・D6（RESET）が最後まで Low のままである。
+   2. D2〜D4（DMODE）・D5（CLK）・D6（RESET）が最後まで Low のままである。CAN_S を ch に接続している場合は、マーカ 2 以降で Low であることも確認する。
    3. D7 にマーカ 1〜5 が順に出ている。3V3 立ち上がりから各マーカまでの時間を記録する。
    4. VREF（A0）：マーカ 3 より前の値を記録する（判定しない）。マーカ 3 から 10 ms 後以降が 0.25 V 以下で安定している（R34×C14 の時定数 1 ms）。
 5. LED_COMM 点灯・LED_FAULT 消灯・LED_MCU 1 Hz 点滅を確認する。
-6. テスタで定常値を測る：EN、DMODE0/1/2、RESET、AGC0/1、CLK（IC1 側）が Low、MOTVREF_TP1 が 0.25 V 以下。
+6. テスタで定常値を測る：EN、DMODE0/1/2、RESET、AGC0/1、CLK（IC1 側）が Low、CAN_S（TJA1441AT S(8) または PC15）が Low（0.4 V 以下）、MOTVREF_TP1 が 0.25 V 以下。
 7. 4.4 の手順で結果を読み出す。
 8. 電源を切り、10 秒以上待ってから条件 C2・C3・C4 で 2〜7 を繰り返す。VM がある条件では次も確認する。
    - VM 電流：ロジック電源を入れる前後（C2）、VM を入れた直後（C3）で増えない。値を記録する。
@@ -188,7 +191,7 @@ LED 表示：
 1. `Release` を書き込み、全電源を切る。
 2. 4.1 の 2〜4 と同じ接続・設定で、条件 C1 と C4 で電源を入れる（マーカは出ない）。
 3. 確認内容：
-   - C1（VM なし）：EN・DMODE・CLK・RESET が最後まで Low。状態は NO_VM のまま。
+   - C1（VM なし）：EN・DMODE・CLK・RESET が最後まで Low。状態は NO_VM のまま。CAN_S は `board_init()` 以降 Low のまま（製品ファームは `comm_init()` が CAN 起動前にも Low にする）。
    - C4（VM あり）：EN が最後まで Low（ENABLE コマンドを送らない限り励磁しない）。DMODE は VM が正常範囲で 50 ms 安定するまで 000 のままで、その後に設定の分割値へ変わる（FR-MON-03 による正常動作）。3V3 立ち上がりから DMODE が変わるまでの時間を記録する。
    - VREF：起動後 0.25 V 以下（電流設定の前）。
 4. 4.4 の GPIO・DAC レジスタの読み出しを C1 で行う（試験用構造体は製品ファームにはない）。
@@ -200,8 +203,10 @@ HOTPLUG 接続はリセットも停止もしないので、動作中の状態を
 ```powershell
 # GPIOA IDR/ODR（PA8 = bit8 CLK、PA10 = bit10 EN）
 & $env:STM32_PROG -c port=SWD mode=HOTPLUG -r32 0x48000010 2
-# GPIOB IDR/ODR（PB8/9 = AGC、PB12-14 = DMODE、PB15 = RESET）
+# GPIOB IDR/ODR（PB10/11 = AGC、PB12-14 = DMODE、PB15 = RESET。PB8/9 は CAN1 なので判定しない）
 & $env:STM32_PROG -c port=SWD mode=HOTPLUG -r32 0x48000410 2
+# GPIOC IDR/ODR（PC15 = CAN_S が bit15 = 0 であること）
+& $env:STM32_PROG -c port=SWD mode=HOTPLUG -r32 0x48000810 2
 # DAC1 CR（bit0 EN1 = 1 であること）
 & $env:STM32_PROG -c port=SWD mode=HOTPLUG -r32 0x40007400 1
 # DAC1 DOR1（0 であること）
@@ -211,7 +216,8 @@ HOTPLUG 接続はリセットも停止もしないので、動作中の状態を
 | 値 | 期待 |
 |---|---|
 | GPIOA IDR・ODR `& 0x00000500` | 0 |
-| GPIOB IDR・ODR `& 0x0000F300` | 0 |
+| GPIOB IDR・ODR `& 0x0000FC00` | 0 |
+| GPIOC IDR・ODR `& 0x00008000` | 0（CAN_S = Low） |
 | DAC1 CR `& 0x00000001` | 1 |
 | DAC1 DOR1 | 0 |
 
@@ -254,6 +260,7 @@ arm-none-eabi-nm build/TestPowerOn/driver_fw.elf | Select-String test_poweron_re
 | マーカ 1〜2 の間に High が出る | `board_init()` の ODR 先書き（BRR）とモード設定の順序 |
 | マーカ 2〜4 の間に CLK が High | PA8 を AF にしてから TIM1 を初期化するまでの間の出力（`board_init()` と `stepper_init()` の順序） |
 | VREF がマーカ 3 以降も 0.25 V を超える | DAC1 の設定（バッファ・トリミング）、R34/C14 |
+| CAN_S が High、または Low にならない | `board_init()` の PC15 設定（`board.c`）、PC15 の配線と TJA1441AT S(8) のプルアップ（H-8）。RTC ドメインのピンのため、測定器の負荷で電圧が下がっていないか確認する |
 | LED_FAULT 点灯 | 4.4 で `first_fail_mask` を読み、2.2 のビット表で原因を特定する |
 
 ---
