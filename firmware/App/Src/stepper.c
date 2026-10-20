@@ -38,6 +38,7 @@ static volatile bool touched;        /* パルス出力を開始した、また�
 /* プランナ（パルス出力より 1 ステップ先行する） */
 static float v;                      /* 直前に確定したステップの速度 */
 static int32_t commit_pos;           /* 確定済みステップを全て出した後の位置 */
+static bool braking;                 /* 位置決めで減速に入った（目標の変更・指令があるまで減速を続ける。FR-MOT-03） */
 
 static void make_period(float speed, period_t *p)
 {
@@ -72,10 +73,11 @@ static float plan_next(void)
 
     if (mode == MODE_POS) {
         remaining = ((int64_t)target_pos - commit_pos) * dir;
-        if (remaining == 0) {
+        if (remaining == 0 && v <= vs) {
             v = 0.0f;
             return 0.0f;
         }
+        /* 目標に着いても v > vs なら止まれない（減速距離より近い目標へ変えた場合）: 減速を続けて行き過ぎる */
         vt = remaining > 0 ? prm.max_speed : 0.0f;   /* 目標が後ろ側: 減速して停止 */
     } else if (mode == MODE_VEL) {
         float tv = target_vel * (float)dir;
@@ -97,12 +99,18 @@ static float plan_next(void)
         vn = vs < vt ? vs : vt;
     } else {
         float stop_steps = (v * v - vs * vs) / (2.0f * prm.decel);
-        if ((float)remaining <= stop_steps + 1.0f) {
+        if (braking || (float)remaining <= stop_steps + 1.0f) {
+            braking = (mode == MODE_POS);   /* 一度減速に入ったら続ける（丸めで加速側に戻らない） */
             float v2 = v * v - 2.0f * prm.decel;
             vn = v2 > vs * vs ? sqrtf(v2) : vs;
         } else if (v < vt) {
             vn = sqrtf(v * v + 2.0f * prm.accel);
             if (vn > vt) vn = vt;
+            /* 加速した速度から、残りの距離で減速度 d を守って止まれなければ加速しない（加速度が減速度より大きいとき、
+             * 次のステップで減速距離が一気に伸びて間に合わなくなるのを防ぐ） */
+            if (mode == MODE_POS && (float)(remaining - 1) < (vn * vn - vs * vs) / (2.0f * prm.decel)) {
+                vn = v;
+            }
         } else if (v > vt) {
             float v2 = v * v - 2.0f * prm.decel;
             vn = v2 > vt * vt ? sqrtf(v2) : vt;
@@ -158,6 +166,7 @@ void stepper_move_to(int32_t target)
     uint32_t pm = __get_PRIMASK();
     __disable_irq();
     target_pos = target;
+    braking = false;
     mode = MODE_POS;
     __set_PRIMASK(pm);
 }
@@ -169,6 +178,7 @@ void stepper_move_by(int32_t delta)
     /* 動作中の位置決めは目標からの相対、それ以外は現在位置からの相対 */
     int32_t base = (mode == MODE_POS) ? target_pos : position;
     target_pos = base + delta;
+    braking = false;
     mode = MODE_POS;
     __set_PRIMASK(pm);
 }
@@ -178,6 +188,7 @@ void stepper_run(int32_t speed)
     uint32_t pm = __get_PRIMASK();
     __disable_irq();
     target_vel = (float)speed;
+    braking = false;
     mode = MODE_VEL;
     __set_PRIMASK(pm);
 }
@@ -202,6 +213,7 @@ void stepper_estop(void)
     cur_speed = 0.0f;
     v = 0.0f;
     target_vel = 0.0f;
+    braking = false;
     mode = MODE_IDLE;
     __set_PRIMASK(pm);
 }
@@ -233,6 +245,7 @@ bool stepper_service(void)
     board_pin_write(DRV_DIR_PORT, DRV_DIR_PIN, (d > 0) != prm.invert_dir);
     dir = d;
     v = 0.0f;
+    braking = false;
     commit_pos = position;
 
     float s1 = plan_next();
@@ -309,6 +322,7 @@ bool stepper_set_position(int32_t pos)
         position = pos;
         target_pos = pos;
         target_vel = 0.0f;
+        braking = false;
         mode = MODE_IDLE;
     }
     __set_PRIMASK(pm);

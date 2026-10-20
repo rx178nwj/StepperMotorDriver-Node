@@ -175,7 +175,10 @@ static uint8_t cmd_sync_position(void)
         return RESULT_FAILED;
     }
     uint16_t a = position_axis_count(position_raw(), cfg.sensor_offset);
-    int32_t pos = position_sync_steps(a, cfg.gear_ratio, cfg.steps_per_rev, cfg.microstep);
+    int32_t pos;
+    if (!position_sync_steps(a, cfg.gear_ratio, cfg.steps_per_rev, cfg.microstep, &pos)) {
+        return RESULT_INVALID;   /* 1 回転分のステップ数が 32bit に収まらない */
+    }
     if (!stepper_set_position(pos)) {
         return RESULT_REJECTED;
     }

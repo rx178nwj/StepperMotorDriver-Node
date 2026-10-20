@@ -35,7 +35,9 @@ void position_pa7_set(uint8_t mode, bool dir_level);
 uint16_t position_axis_count(uint16_t raw, uint16_t offset);
 /* SHAFT_ANGLE [0.01°] = a × 36000 / 4096（四捨五入）。raw が 0〜4095 でなければ 0xFFFF */
 uint16_t position_shaft_angle(uint16_t raw, uint16_t offset);
-/* SYNC_POSITION: a × gear_ratio × steps_per_rev × microstep / 4096（四捨五入、64bit で計算） */
-int32_t position_sync_steps(uint16_t a, uint16_t gear_ratio, uint16_t steps_per_rev, uint8_t microstep);
+/* SYNC_POSITION: a × gear_ratio × steps_per_rev × microstep / 4096（四捨五入、64bit で計算）を *out に返す。
+ * 結果は 0〜N−1（N = gear_ratio × steps_per_rev × microstep）で、四捨五入で N になったら 0。
+ * N が INT32_MAX を超えるときは false を返し *out は変えない（FR-POS-06・07） */
+bool position_sync_steps(uint16_t a, uint16_t gear_ratio, uint16_t steps_per_rev, uint8_t microstep, int32_t *out);
 
 #endif /* POSITION_H */

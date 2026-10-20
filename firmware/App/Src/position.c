@@ -39,10 +39,18 @@ uint16_t position_shaft_angle(uint16_t raw, uint16_t offset)
     return (uint16_t)((a * 36000u + 2048u) >> 12);
 }
 
-int32_t position_sync_steps(uint16_t a, uint16_t gear_ratio, uint16_t steps_per_rev, uint8_t microstep)
+bool position_sync_steps(uint16_t a, uint16_t gear_ratio, uint16_t steps_per_rev, uint8_t microstep, int32_t *out)
 {
-    uint64_t n = (uint64_t)a * gear_ratio * steps_per_rev * microstep;
-    return (int32_t)((n + 2048u) >> 12);
+    uint64_t total = (uint64_t)gear_ratio * steps_per_rev * microstep;   /* N: 出力軸 1 回転分のステップ数 */
+    if (total > (uint64_t)INT32_MAX) {
+        return false;
+    }
+    uint64_t n = ((uint64_t)a * total + 2048u) >> 12;
+    if (n >= total) {
+        n = 0;   /* 四捨五入で 1 回転分になったら 0（結果は 0〜N−1） */
+    }
+    *out = (int32_t)n;
+    return true;
 }
 
 /* ---------------------------------------------------------------- I2C1（レジスタ直接、DWT で時間制限） */
