@@ -62,7 +62,7 @@ class TabTest(unittest.TestCase):
     def test_tab_specs(self) -> None:
         labels = [t.label for t in vs.tab_specs()]
         self.assertEqual(labels, ["操作", "設定", "モーション", "状態遷移", "監視", "センサ", "J10・原点", "通信統計",
-                                  "診断", "その他", "グラフ"])
+                                  "診断", "その他", "名前表", "グラフ"])
         groups = [t.group for t in vs.tab_specs() if t.group]
         self.assertEqual(groups, ["motion", "state", "monitor", "sensor", "j10", "comm", "diag", "other"])
         for g in groups:
@@ -214,7 +214,7 @@ class SettingsViewTest(unittest.TestCase):
     def test_tab_kinds(self) -> None:
         kinds = [t.kind for t in vs.tab_specs()]
         self.assertEqual(kinds[:2], [vs.TAB_OPS, vs.TAB_SETTINGS])
-        self.assertEqual(kinds[-1], vs.TAB_GRAPH)
+        self.assertEqual(kinds[-2:], [vs.TAB_SYMS, vs.TAB_GRAPH])
 
 
 class StatsTest(unittest.TestCase):

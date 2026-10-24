@@ -56,6 +56,11 @@ _LAMP_COLORS: Dict[Tuple[str, str], str] = {
     ("CONFIG_STATUS", "SAVE_FAILED"): RED,
     ("INPUT_STATUS", "HOME_FAILED"): RED,
     ("INPUT_STATUS", "LIMIT_STOP"): ORANGE,
+    ("SENSOR_STATUS", "MH"): ORANGE,
+    ("SENSOR_STATUS", "ML"): ORANGE,
+    ("SENSOR_STATUS", "NO_RESPONSE"): RED,
+    ("AS_STATUS", "MH"): ORANGE,       # AS5600 STATUS（磁石が強すぎる・弱すぎる）
+    ("AS_STATUS", "ML"): ORANGE,
 }
 
 
@@ -134,6 +139,7 @@ SETTINGS_PERIOD_S = 1.0
 
 TAB_OPS = "ops"
 TAB_SETTINGS = "settings"
+TAB_SYMS = "syms"
 TAB_GRAPH = "graph"
 
 
@@ -142,17 +148,18 @@ class TabSpec:
     label: str
     group: Optional[str]      # 項目表のグループ。None なら専用の画面かプレースホルダ
     note: str = ""            # プレースホルダの説明
-    kind: str = ""            # 専用の画面の種類（TAB_OPS / TAB_SETTINGS）またはプレースホルダ（TAB_GRAPH）
+    kind: str = ""            # 専用の画面の種類（TAB_OPS / TAB_SETTINGS / TAB_SYMS）またはプレースホルダ（TAB_GRAPH）
 
 
 def tab_specs() -> List[TabSpec]:
-    """表示順: 操作・設定・各内部グループ・グラフ。"""
+    """表示順: 操作・設定・各内部グループ・名前表・グラフ。"""
     labels = {"motion": "モーション", "state": "状態遷移", "monitor": "監視", "sensor": "センサ",
               "j10": "J10・原点", "comm": "通信統計", "diag": "診断", "other": "その他"}
     out = [TabSpec("操作", None, kind=TAB_OPS), TabSpec("設定", None, kind=TAB_SETTINGS)]
     for g in itemsmod.GROUPS:
         if g in labels:
             out.append(TabSpec(labels[g], g))
+    out.append(TabSpec("名前表", None, kind=TAB_SYMS))
     out.append(TabSpec("グラフ", None, "グラフは G5 で実装予定です", TAB_GRAPH))
     return out
 
@@ -201,13 +208,29 @@ def _code_name(code: Any) -> str:
         return str(code)
 
 
+# 書き込みログの値に付ける単位（レジスタ名 -> 単位）。項目を持たないレジスタ（MOVE_REL など）は付けない
+_REG_UNITS: Dict[str, str] = {i.reg.name: i.unit for i in itemsmod.build_items() if i.reg is not None and i.unit}
+
+
+def _reg_name(target: Any) -> str:
+    """WriteReg.target（"reg.RUN_CURRENT"・"MOVE_REL"・アドレス）をレジスタ名にする。"""
+    if isinstance(target, int):
+        for r in regs.REGISTERS:
+            if r.addr == target:
+                return r.name
+        return f"0x{target:02X}"
+    return str(target)[4:] if str(target).startswith("reg.") else str(target)
+
+
 def request_label(req: Any) -> str:
     if isinstance(req, wk.Command):
         return f"COMMAND {_code_name(req.code)}"
     if isinstance(req, wk.Broadcast):
         return f"ブロードキャスト {_code_name(req.code)}"
     if isinstance(req, wk.WriteReg):
-        return f"書き込み {req.target} = {req.value}"
+        name = _reg_name(req.target)
+        unit = _REG_UNITS.get(name, "")
+        return f"書き込み {name} = {req.value}" + (f" {unit}" if unit else "")
     return type(req).__name__
 
 

@@ -18,6 +18,7 @@ except ImportError:
     HAVE_QT = False
 
 from nemadbg.sim import SimSerial
+from nemagui import summary as sm
 from nemagui import viewstate as vs
 from nemagui import worker as wk
 
@@ -63,7 +64,7 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(self.win.conn_bar.state_label.text(), "接続中")
         self.assertIn("BOARD_ID 3", self.win.conn_bar.info_label.text())
         self.assertTrue(self.win.overview.isEnabled())
-        self.assertEqual(self.win.tabs.count(), 11)
+        self.assertEqual(self.win.tabs.count(), 12)
 
         self.win.send_command(wk.Cmd.ENABLE)
         self.wait_for(lambda: "COMMAND ENABLE: OK" in self.win.log.toPlainText())
@@ -408,6 +409,257 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(len(fonts), 1, fonts)
         self.assertGreaterEqual(len(colors), 3)                           # 色は行ごとに付く
         self.assertEqual(self.win.log.document().defaultFont().toString(), self.win.log.font().toString())
+
+
+    # ---- G4: 要点パネル・名前表ブラウザ・ウォッチ ----
+
+    def open_group(self, group: str):
+        self.connect_up()
+        names = {sp.group: n for n, sp in enumerate(self.win._specs)}
+        self.win.tabs.setCurrentIndex(names[group])
+        return self.win._panels[group]
+
+    def test_panels_exist_for_internal_tabs(self) -> None:
+        self.assertEqual(sorted(self.win._panels), ["comm", "diag", "j10", "motion", "sensor", "state"])
+        self.assertNotIn("monitor", self.win._panels)
+        self.assertNotIn("other", self.win._panels)
+        for g in self.win._panels:                      # 汎用表は詳細として残る
+            self.assertIn(g, self.win._tables)
+
+    def test_motion_panel(self) -> None:
+        p = self.open_group("motion")
+        self.assertIn("sym.hold_active", self.win.worker._polls["tab"][0])
+        self.wait_for(lambda: p.mode.text() == "IDLE")
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.win.model.value("reg.STATE") == 2)
+        self.win.worker.send(wk.WriteReg("RUN_SPEED", 1000))
+        self.wait_for(lambda: p.mode.text() == "VEL" and p.running.is_on)
+        self.wait_for(lambda: p.cur_speed.text() != "—" and float(p.cur_speed.text().split()[0]) > 100)
+        self.assertEqual(p.dir.text(), "→")
+        self.assertTrue(p.target_vel.text().startswith("1000"))
+        self.win.worker.send(wk.WriteReg("RUN_SPEED", 0))
+        self.wait_for(lambda: not p.running.is_on, timeout=6.0)
+        pos = self.win.model.value("reg.POSITION")
+        self.win.worker.send(wk.WriteReg("MOVE_REL", 600))
+        self.wait_for(lambda: p.mode.text() == "POS")
+        self.wait_for(lambda: p.remain.text() not in ("—", "0 step") and int(p.remain.text().split()[0]) > 0)
+        self.wait_for(lambda: p.position.text() == f"{pos + 600} step" and not p.running.is_on, timeout=10.0)
+        self.wait_for(lambda: p.remain.text() == "0 step")
+
+    def test_state_panel_fault_lamps(self) -> None:
+        p = self.open_group("state")
+        self.assertTrue(set(p.keys) <= {i.key for i in self.win._items})
+        self.wait_for(lambda: p.state.text() == "DISABLED")
+        self.assertFalse(any(p.fault._shown))
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: p.state.text() == "ENABLED")
+        self.win.sim_dock._inject("OPD", 0x01)
+        self.wait_for(lambda: p.state.text() == "FAULT")
+        self.wait_for(lambda: p.fault._shown[0] is True)             # OPD
+        self.assertIn("d32f2f", p.state.styleSheet().lower())
+        self.wait_for(lambda: p.cfg._shown[0] is True)               # LOADED
+        self.assertNotEqual(p.cmd_result.text(), "—")
+
+    def test_sensor_panel(self) -> None:
+        p = self.open_group("sensor")
+        self.wait_for(lambda: p.raw.text() != "—" and p.ok.text() != "—")
+        self.wait_for(lambda: p.status._shown[0] is True)            # VALID
+        self.assertEqual([lab.text() for lab in p.as_status._labels], ["MH", "ML", "MD"])
+        self.wait_for(lambda: p.as_status._shown[2] is True)         # MD（磁石検出）
+        self.assertEqual(p.streak.text(), "0")
+        self.wait_for(lambda: "+" in p.ok.text(), timeout=5.0)       # 毎秒の増加量
+        self.assertIn("°", p.angle.text())
+
+    def test_j10_panel_home_progress(self) -> None:
+        p = self.open_group("j10")
+        self.sim.set_home_switches(1500, None)
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.win.model.value("reg.STATE") == 2)
+        self.win.worker.send(wk.WriteReg("reg.J10_MODE", 2))
+        self.win.worker.send(wk.WriteReg("reg.HOME_SPEED", 3000))
+        self.wait_for(lambda: "J10_MODE = 2: OK" in self.log_text() and "HOME_SPEED = 3000 step/s: OK" in self.log_text())
+        self.wait_for(lambda: p._stage_sig == (0, False))            # IDLE を強調
+        seen = set()
+
+        def watch() -> bool:
+            seen.add(p._stage_sig)
+            return p._stage_sig == (5, False)
+
+        self.win.worker.send(wk.Command(wk.Cmd.HOME_POS))
+        self.wait_for(watch, timeout=10.0)
+        self.assertIn(1, {s[0] for s in seen})                       # SEEK を経由
+        self.assertIn("HOME1", p.side.text())
+        self.assertTrue(p.input_status._shown[3])                    # HOMED
+        self.assertEqual(p.stage_labels[5].text(), "DONE")
+        self.assertIn("1976d2", p.stage_labels[5].styleSheet().lower())     # 現在段階は青
+        self.assertIn("c8e6c9", p.stage_labels[0].styleSheet().lower())     # 通過済み
+
+    def test_j10_panel_failed(self) -> None:
+        p = self.open_group("j10")
+        self.sim.set_home_switches(None, None)
+        self.sim.set_home_travel_limit(400)
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.win.model.value("reg.STATE") == 2)
+        self.win.worker.send(wk.WriteReg("reg.J10_MODE", 2))
+        self.win.worker.send(wk.WriteReg("reg.HOME_SPEED", 3000))
+        self.win.worker.send(wk.Command(wk.Cmd.HOME_POS))
+        self.wait_for(lambda: p._stage_sig == (None, True), timeout=10.0)
+        self.assertIn("d32f2f", p.failed.styleSheet().lower())
+        self.assertEqual(p.hm1.bar.maximum(), 2)
+
+    def test_comm_panel_colors(self) -> None:
+        from PySide6.QtGui import QColor
+
+        p = self.open_group("comm")
+        self.wait_for(lambda: p.usb_table.item(0, 1).text() not in ("—", ""))
+        self.assertTrue(p.can_table.item(8, 1).text().startswith("0x"))          # err_last_code は 16 進
+        cell = p.usb_table.item(list(sm.COMM_USB_KEYS).index("sym.usb_stats.crc_errors"), 1)
+        t = time.time()
+        raw = lambda v: v.to_bytes(4, "little")
+        m = self.win.model
+        m.update(t, {"sym.usb_stats.crc_errors": raw(0)})
+        m.update(t + 1.1, {"sym.usb_stats.crc_errors": raw(0)})
+        p.refresh(m)
+        self.assertNotIn(cell.foreground().color().name(), (QColor(vs.ORANGE).name(), QColor(vs.RED).name()))
+        m.update(t + 2.2, {"sym.usb_stats.crc_errors": raw(3)})                  # 0 でなくなり、増加中
+        p.refresh(m)
+        self.assertEqual(cell.text(), "3")
+        self.assertEqual(cell.foreground().color().name(), QColor(vs.RED).name())
+        m.update(t + 3.3, {"sym.usb_stats.crc_errors": raw(3)})                  # 増加が止まれば橙
+        p.refresh(m)
+        self.assertEqual(cell.foreground().color().name(), QColor(vs.ORANGE).name())
+        ok = p.usb_table.item(list(sm.COMM_USB_KEYS).index("sym.usb_stats.rx_frames"), 1)
+        self.assertNotIn(ok.foreground().color().name(), (QColor(vs.ORANGE).name(), QColor(vs.RED).name()))
+
+    def test_diag_panel(self) -> None:
+        p = self.open_group("diag")
+        self.wait_for(lambda: p.uptime.text() != "—")
+        self.assertRegex(p.uptime.text(), r"^0 日 \d\d:\d\d:\d\d\.\d{3}$")
+        first = p.uptime.text()
+        self.wait_for(lambda: p.uptime.text() != first)
+        self.assertEqual(p.reset_main.text(), "電源投入（POR/BOR）")
+        self.assertEqual(p.reset_flags.text(), "PINRSTF, BORRSTF")
+        self.assertIn("704 / 12288 B", p.stack_text.text())
+        self.assertEqual(p.stack_bar.format(), "5.7 %")
+        self.assertIn(vs.GREEN, p.stack_bar.styleSheet())
+        m = self.win.model
+        for used, color in ((9500, vs.ORANGE), (11500, vs.RED)):      # 77.3 % / 93.6 %
+            m.update(time.time(), {"sym.stack.used_max": used.to_bytes(4, "little")})
+            p.refresh(m)
+            self.assertIn(color, p.stack_bar.styleSheet())
+
+    def test_sym_browser_filter_and_read(self) -> None:
+        self.connect_up()
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_SYMS))
+        b = self.win.sym_browser
+        total = b.table.rowCount()
+        self.assertGreater(total, 90)
+        self.assertEqual(len(b.visible_names), total)
+        self.assertEqual([b.table.horizontalHeaderItem(c).text() for c in range(6)],
+                         ["名前", "アドレス", "TYPE", "NUM", "サイズ", "グループ"])
+        b.filter_edit.setText("USB_STATS")
+        names = b.visible_names
+        self.assertTrue(names and all("usb_stats" in n for n in names))
+        self.assertIn("usb_stats", names)                                  # 構造体全体も一覧に出る
+        self.assertIn(f"{len(names)} / {total}", b.count_label.text())
+        self.assertFalse(b.read_button.isEnabled())                        # 未選択
+        names_all = [i.name for i in b._infos]
+        b.table.selectRow(names_all.index("usb_stats.rx_frames"))
+        self.assertTrue(b.read_button.isEnabled())
+        b.read_button.click()
+        self.wait_for(lambda: "usb_stats.rx_frames = " in b.result.toPlainText())
+        b.table.selectRow(names_all.index("usb_stats"))                    # bytes 型は 16 進ダンプ
+        b.read_button.click()
+        self.wait_for(lambda: "usb_stats (32 B)" in b.result.toPlainText())
+        self.assertIn("0010: ", b.result.toPlainText())
+        self.assertNotIn("読み出し失敗", self.log_text())
+        b.filter_edit.setText("")
+        self.assertEqual(len(b.visible_names), total)
+        row = names_all.index("state")                                     # アドレスは 16 進、TYPE は名前
+        self.assertTrue(b.table.item(row, 1).text().startswith("0x2"))
+        self.assertEqual(b.table.item(row, 2).text(), "u8")
+        self.assertEqual(b.table.item(row, 5).text(), "状態遷移・異常")
+
+    def test_watch_add_update_remove(self) -> None:
+        self.connect_up()
+        w = self.win.watch_dock
+        polls = self.win.worker._polls
+        self.assertNotIn("watch", polls)                                   # 空なら組を外す
+        got = []
+        w.changed.connect(got.append)
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_SYMS))
+        b = self.win.sym_browser
+        b.table.selectRow([i.name for i in b._infos].index("sensor.i2c_ok"))
+        b.watch_button.click()
+        self.assertEqual(w.keys(), ["sym.sensor.i2c_ok"])
+        self.assertEqual(got[-1], ["sym.sensor.i2c_ok"])
+        self.assertEqual(polls["watch"], (frozenset(["sym.sensor.i2c_ok"]), 0.2))
+        self.assertFalse(w.add("sym.sensor.i2c_ok"))                       # 重複は無視
+        self.win.add_to_watch("reg.POSITION")                              # レジスタ項目
+        self.assertEqual(w.keys(), ["sym.sensor.i2c_ok", "reg.POSITION"])
+        self.wait_for(lambda: w.table.item(0, 1).text() not in ("—", ""))
+        self.wait_for(lambda: w.table.item(0, 3).text().startswith("+"), timeout=5.0)   # 毎秒
+        self.assertEqual(w.table.item(1, 2).text(), "step")
+        v0 = w.table.item(0, 1).text()
+        self.wait_for(lambda: w.table.item(0, 1).text() != v0)             # 値が更新される
+        w.period_spin.setValue(500)
+        self.assertEqual(polls["watch"][1], 0.5)
+        w.table.cellWidget(0, 4).click()                                   # 削除ボタン
+        self.assertEqual(w.keys(), ["reg.POSITION"])
+        w.remove("reg.POSITION")
+        self.assertNotIn("watch", polls)
+
+    def test_watch_from_group_table_signal(self) -> None:
+        self.connect_up()
+        t = self.win._tables["motion"]
+        t.add_to_watch.emit(t.keys[0])
+        self.assertEqual(self.win.watch_dock.keys(), [t.keys[0]])
+        self.assertEqual(t.contextMenuPolicy(), Qt.CustomContextMenu)
+
+    def test_watch_restored_on_restart(self) -> None:
+        from nemagui.ui.main_window import AppConfig, MainWindow
+
+        self.connect_up()
+        self.win.add_to_watch("sym.position")
+        self.win.add_to_watch("sym.cfg")                                   # 接続後にだけ存在する項目
+        self.win.add_to_watch("reg.VM_MV")
+        self.win.watch_dock.period_spin.setValue(300)
+        self.win.close()
+        s = QSettings(self.settings_path, QSettings.IniFormat)
+        self.assertEqual(sm.decode_watch_keys(s.value("watch/keys")), ["sym.position", "sym.cfg", "reg.VM_MV"])
+        s.setValue("watch/keys", sm.encode_watch_keys(["sym.position", "sym.cfg", "reg.VM_MV", "sym.no_such"]))
+        s.sync()
+        sim2 = SimSerial(noise=False, warmup_ms=200)
+        win2 = MainWindow(AppConfig(sim=sim2, timeout_ms=100, reconnect_interval_s=0.1, stats_period_s=0.2),
+                          QSettings(self.settings_path, QSettings.IniFormat))
+        try:
+            win2.show()
+            self.assertEqual(win2.watch_dock.period_s, 0.3)
+            self.assertIn("watch", win2.worker._polls)
+            end = time.monotonic() + 4
+            want = ["reg.VM_MV", "sym.cfg", "sym.position"]
+            while time.monotonic() < end and sorted(win2.watch_dock.keys()) != want:
+                self.app.processEvents()
+                time.sleep(0.005)
+            self.assertEqual(sorted(win2.watch_dock.keys()), want)
+            self.assertNotIn("sym.no_such", win2.watch_dock.keys())        # 存在しない key は無視
+            end = time.monotonic() + 4
+            while time.monotonic() < end and win2.watch_dock.table.item(0, 1).text() in ("—", ""):
+                self.app.processEvents()
+                time.sleep(0.005)
+            self.assertNotIn(win2.watch_dock.table.item(0, 1).text(), ("—", ""))
+        finally:
+            win2.close()
+            self.assertFalse(win2.worker.is_alive())
+
+    def test_settings_write_log_uses_register_name(self) -> None:
+        st = self.open_settings()
+        key = "reg.RUN_CURRENT"
+        b = int(self.board_text(st, key))
+        st.editors[key]._spin.setValue(b + 100)
+        st.write_button.click()
+        self.wait_for(lambda: f"書き込み RUN_CURRENT = {b + 100} mA: OK" in self.log_text())
+        self.assertNotIn("reg.RUN_CURRENT", self.log_text())
 
 
 if __name__ == "__main__":

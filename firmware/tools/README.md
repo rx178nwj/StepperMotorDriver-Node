@@ -130,7 +130,7 @@ python -m unittest discover -s tests
 
 # nemagui
 
-`nemadbg` と同じ USB CDC で基板につなぐ PC 側のデバッグ GUI（PySide6）。現状は接続・状態概要・非常停止・操作タブ・設定タブ・内部状態の項目表・ログ・統計までを備える。グラフは今後実装する（タブはプレースホルダ）。
+`nemadbg` と同じ USB CDC で基板につなぐ PC 側のデバッグ GUI（PySide6）。現状は接続・状態概要・非常停止・操作タブ・設定タブ・内部状態の要点パネルと項目表・名前表ブラウザ・ウォッチ・ログ・統計までを備える。グラフは今後実装する（タブはプレースホルダ）。
 
 ## インストールと起動
 
@@ -154,7 +154,17 @@ python -m unittest discover -s tests
   - 「変更を書き込み」は変更行だけを順に送り、行ごとに OK / REJECTED / INVALID / 不明を出し、全結果が返ったら読み直す。「読み直し」は基板の値を取り直して編集値を戻す。編集中の値はポーリングで上書きしない（基板の値の列だけ更新）。
   - CONFIG_STATUS のランプ（UNSAVED のときは橙の帯でも知らせる）。「Flash に保存」「Flash から読み直し」「工場出荷値（RAM のみ）」は停止中のみ有効で、後ろ 2 つは確認ダイアログを出す。実行後に設定を読み直す。
   - 表示中だけ設定値と CONFIG_STATUS を 1 秒ごとに読む（ポーリング組 `settings`）。
-- 中央のその他のタブ: 内部状態（モーション・状態遷移・監視・センサ・J10・原点・通信統計・診断・その他）の項目表。表示中のタブの項目だけを読む。累積カウンタは値の横に `+N/s` を出す。
+- 中央のその他のタブ: 内部状態（モーション・状態遷移・監視・センサ・J10・原点・通信統計・診断・その他）の項目表。表示中のタブの項目だけを読む（ポーリング組 `tab`）。累積カウンタは値の横に `+N/s` を出す。項目表の行を右クリックすると「ウォッチに追加」できる。
+  - 監視・その他を除く各タブは、上部に要点パネル、下に詳細の項目表を置く。
+    - モーション: mode（IDLE/POS/VEL）、パルス出力中・保持電流のランプ、方向の矢印、現在速度・プランナ速度・目標速度、現在位置・目標位置・目標までの残り step・確定済み先行位置。
+    - 状態遷移・異常: STATE の色、fault / isr_fault のビットランプ、vm_ok・temp_warn・lo_armed・hold_active のランプ、cmd_result、cfg_status のビット。
+    - センサ: SENSOR_STATUS と AS5600 STATUS（MH / ML / MD）のランプ、RAW ANGLE・軸角度、I2C 成功・失敗と毎秒の失敗数、連続失敗（3 以上で無効）、PA7 の機能。
+    - J10・原点: home.state の段階（IDLE→SEEK→SEEK_STOP→BACK→BACK_STOP→DONE の現在段階を強調、FAILED は別表示）、対象の側、INPUT_STATUS のビット、HOME1 / HOME2 の確定・サンプルのランプと連続回数（`HOME_CONFIRM_SAMPLES` = 2 に対する進捗）、enc_count・agc_out・limit_stopped。
+    - 通信統計: CAN と USB のカウンタの値と毎秒の増加量。異常系カウンタ（rx_dropped・tx_dropped・err_*・crc_errors・dropped・rx_overflow・rx_timeouts・bad_len）は 0 でなければ橙、増加中なら赤。err_last_code は 16 進。
+    - 診断: 稼働時間（`N 日 hh:mm:ss.mmm`）、reset_csr の解読（立っているフラグと主要因）、ループ周期、スタック使用量のバーと %（75% 以上で橙、90% 以上で赤）。
+    - reset_csr の主要因は、IWDG → WWDG → 低消費電力 → ソフトウェア（`ENTER_BOOTLOADER` 等）→ ファイアウォール → 電源投入（POR/BOR）→ オプションバイトのロード → NRST ピンの順に最初に立っているものとする（ソフトウェアリセットやウォッチドッグでも PINRSTF が、電源投入でも BORRSTF と PINRSTF が立つため、NRST ピンは最後）。
+- 中央の「名前表」タブ: 接続時に得た名前表の全件を、名前・アドレス・TYPE・NUM・サイズ・グループの表で出す。名前の部分一致で絞り込み、選んで「読む」（1 回読んで値を表示。bytes 型は 16 進ダンプ）、「ウォッチに追加」ができる。
+- ウォッチ（右のドック。「表示」メニューで出し入れ）: 名前表の項目・レジスタ項目を集めて、表示名・値・単位・毎秒の増加量を常時表示する。ドックのコンボから追加でき、削除ボタンと周期（既定 200 ms）がある。ポーリング組 `watch` で読み、空なら組を外す。一覧と周期は QSettings に保存して次回起動で復元する（接続後に存在しない項目は無視）。G5 のグラフは `MainWindow.watch_dock.keys()`（key の並び）と `changed` シグナルを系列の候補に使える。
 - 下: ログ（接続・切断・異常通知・書き込み結果・注意。最大 5000 行）。ステータスバーに通信統計。
 
 ## ショートカット
@@ -165,4 +175,4 @@ python -m unittest discover -s tests
 
 ## テスト
 
-`tests/test_gui_qt.py` は `QT_QPA_PLATFORM=offscreen` で動く（PySide6 が無ければスキップ）。画面を介さない表示ロジック（操作の受付条件を含む）は `nemagui/viewstate.py`、設定タブの編集状態は `nemagui/settings_edit.py` にあり、`tests/test_gui_viewstate.py`・`tests/test_gui_settings_edit.py` で試験する。設定タブの確認ダイアログは `AppConfig.confirm`（または `SettingsTab.confirm`）で差し替えられる。
+`tests/test_gui_qt.py` は `QT_QPA_PLATFORM=offscreen` で動く（PySide6 が無ければスキップ）。画面を介さない表示ロジック（操作の受付条件を含む）は `nemagui/viewstate.py`、要点パネル・名前表ブラウザ・ウォッチの判定と整形は `nemagui/summary.py`（`tests/test_gui_summary.py`）、設定タブの編集状態は `nemagui/settings_edit.py` にあり、`tests/test_gui_viewstate.py`・`tests/test_gui_settings_edit.py` で試験する。設定タブの確認ダイアログは `AppConfig.confirm`（または `SettingsTab.confirm`）で差し替えられる。

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit,
 from nemadbg.link import Link, find_ports, open_serial
 
 from .. import items as itemsmod
+from .. import summary as sm
 from .. import viewstate as vs
 from .. import worker as wk
 from ..items import Item
@@ -23,8 +24,11 @@ from .conn_bar import ConnectionBar
 from .items_table import GroupTable
 from .ops_tab import OpsTab
 from .overview import OverviewPanel, overview_keys
+from .panels import PANEL_FACTORIES, SummaryPanel
 from .settings_tab import CONFIG_STATUS_KEY, SettingsTab
 from .sim_dock import SimDock
+from .sym_browser import SymBrowser
+from .watch_dock import WatchDock
 
 LOG_MAX_LINES = 5000
 PUMP_INTERVAL_MS = 20
@@ -78,15 +82,29 @@ class MainWindow(QMainWindow):
                                 stats_period_s=config.stats_period_s)
         self._build_ui()
         self._build_shortcuts()
+        self.watch_dock = WatchDock(self._items, sm.decode_watch_keys(self._settings.value("watch/keys", "")),
+                                    sm.clamp_watch_period(self._settings.value("watch/period_s", sm.WATCH_PERIOD_S)),
+                                    self)
+        self.watch_dock.changed.connect(self._on_watch_changed)
+        self.watch_dock.period_changed.connect(lambda _p: self._apply_watch_poll())
+        self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
         if config.sim is not None:
             self.sim_dock: Optional[SimDock] = SimDock(config.sim, self.log_info, self)
             self.addDockWidget(Qt.RightDockWidgetArea, self.sim_dock)
         else:
             self.sim_dock = None
+        view = self.menuBar().addMenu("表示")
+        view.addAction(self.watch_dock.toggleViewAction())
+        if self.sim_dock is not None:
+            view.addAction(self.sim_dock.toggleViewAction())
+        for t in self._tables.values():
+            t.add_to_watch.connect(self.add_to_watch)
+        self.sym_browser.add_to_watch.connect(self.add_to_watch)
 
         self.worker.set_poll(vs.OVERVIEW_POLL, overview_keys(), vs.OVERVIEW_PERIOD_S)
         self._restore_settings()
         self._apply_tab_poll()
+        self._apply_watch_poll()
 
         self._timer = QTimer(self)
         self._timer.setInterval(PUMP_INTERVAL_MS)
@@ -174,12 +192,16 @@ class MainWindow(QMainWindow):
                                         self._config.confirm)
         self.tabs = QTabWidget()
         self._specs = vs.tab_specs()
+        self.sym_browser = SymBrowser(self.worker.send)
         self._tables: Dict[str, GroupTable] = {}
+        self._panels: Dict[str, SummaryPanel] = {}
         for spec in self._specs:
             if spec.kind == vs.TAB_OPS:
                 w: QWidget = self.ops_tab
             elif spec.kind == vs.TAB_SETTINGS:
                 w = self.settings_tab
+            elif spec.kind == vs.TAB_SYMS:
+                w = self.sym_browser
             elif spec.group is None:
                 w = QLabel(spec.note)
                 w.setAlignment(Qt.AlignCenter)
@@ -187,7 +209,20 @@ class MainWindow(QMainWindow):
                 t = GroupTable()
                 t.set_items([i for i in self._items if i.group == spec.group])
                 self._tables[spec.group] = t
-                w = t
+                factory = PANEL_FACTORIES.get(spec.group)
+                if factory is None:
+                    w = t
+                else:
+                    # 上部に要点パネル、下に詳細の汎用項目表
+                    panel = factory()
+                    self._panels[spec.group] = panel
+                    sp = QSplitter(Qt.Vertical)
+                    sp.setChildrenCollapsible(False)
+                    sp.addWidget(panel)
+                    sp.addWidget(t)
+                    sp.setStretchFactor(0, 0)
+                    sp.setStretchFactor(1, 1)
+                    w = sp
             self.tabs.addTab(w, spec.label)
         self.tabs.currentChanged.connect(lambda _i: self._apply_tab_poll())
 
@@ -260,6 +295,7 @@ class MainWindow(QMainWindow):
     def _save_settings(self) -> None:
         self._settings.setValue("geometry", self.saveGeometry())
         self._settings.setValue("tab", self.tabs.currentIndex())
+        self._save_watch()
         self._settings.sync()
 
     # ---- タブとポーリング ----
@@ -293,12 +329,46 @@ class MainWindow(QMainWindow):
         if kind == vs.TAB_OPS:
             self.ops_tab.refresh(self.model, self._kind == vs.CONN_CONNECTED)
         g = self.active_group
-        keys = vs.group_keys(self._items, g) if g else []
+        keys = self._tab_poll_keys(g) if g else []
         if g and keys:
             self.worker.set_poll(vs.TAB_POLL, keys, vs.POLL_PERIODS[g])
             self._tables[g].refresh(self.model)
+            if g in self._panels:
+                self._panels[g].refresh(self.model)
         else:
             self.worker.clear_poll(vs.TAB_POLL)
+
+    def _tab_poll_keys(self, group: str) -> List[str]:
+        """グループの項目に、要点パネルが他のグループから使う項目（hold_active など）を足した key。"""
+        keys = vs.group_keys(self._items, group)
+        panel = self._panels.get(group)
+        if panel is not None:
+            have = {i.key for i in self._items}
+            keys += [k for k in panel.keys if k not in keys and k in have]
+        return keys
+
+    # ---- ウォッチ ----
+
+    def add_to_watch(self, key: str) -> None:
+        """項目をウォッチに追加する（汎用項目表の右クリック・名前表ブラウザから）。"""
+        self.watch_dock.add(key)
+
+    def _on_watch_changed(self, _keys: list) -> None:
+        self._apply_watch_poll()
+        self._save_watch()
+        self._dirty = True
+
+    def _apply_watch_poll(self) -> None:
+        """ポーリング組 "watch" を設定する。ウォッチが空なら外す。"""
+        keys = self.watch_dock.keys()
+        if keys:
+            self.worker.set_poll(sm.WATCH_POLL, keys, self.watch_dock.period_s)
+        else:
+            self.worker.clear_poll(sm.WATCH_POLL)
+
+    def _save_watch(self) -> None:
+        self._settings.setValue("watch/keys", self.watch_dock.to_text())
+        self._settings.setValue("watch/period_s", self.watch_dock.period_s)
 
     # ---- out_q の処理 ----
 
@@ -313,6 +383,7 @@ class MainWindow(QMainWindow):
             self._dirty = False
             self.overview.refresh(self.model)
             self._refresh_active()
+            self.watch_dock.refresh(self.model)
 
     def _refresh_active(self) -> None:
         kind = self.active_kind
@@ -323,6 +394,8 @@ class MainWindow(QMainWindow):
         g = self.active_group
         if g:
             self._tables[g].refresh(self.model)
+            if g in self._panels:
+                self._panels[g].refresh(self.model)
 
     def handle(self, msg: Any) -> None:
         if isinstance(msg, wk.Values):
@@ -335,6 +408,8 @@ class MainWindow(QMainWindow):
                 self._dirty = True
             if SettingsTab.owns(msg.request.tag):
                 self.settings_tab.on_read_result(msg, self.model)
+            elif SymBrowser.owns(msg.request.tag):
+                self.sym_browser.on_read_result(msg)
             for text in msg.errors:
                 self.log_warn("読み出し失敗: " + text)
             return
@@ -347,6 +422,8 @@ class MainWindow(QMainWindow):
             for g, t in self._tables.items():
                 t.set_items([i for i in self._items if i.group == g])
             self.settings_tab.set_items([i for i in self._items if i.group == "settings"])
+            self.sym_browser.set_symtab(msg.symtab, self._items)
+            self.watch_dock.set_items(self._items)
             self._set_kind(vs.CONN_CONNECTED)
             self.conn_bar.set_info(vs.device_info_text(msg))
             self._apply_tab_poll()
@@ -365,6 +442,7 @@ class MainWindow(QMainWindow):
         self.overview.setEnabled(connected)
         self.ops_tab.setEnabled(connected)
         self.settings_tab.set_connected(connected)
+        self.sym_browser.set_connected(connected)
         self._dirty = True
 
     @property
