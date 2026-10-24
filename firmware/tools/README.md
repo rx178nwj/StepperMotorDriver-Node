@@ -16,10 +16,11 @@ pyserial と pyelftools を使う（`protocol.py` と `tests/` のプロトコ�
 ## 使い方
 
 ```powershell
-python -m nemadbg [--port COMx] [--elf PATH] [--timeout MS] <サブコマンド> ...
+python -m nemadbg [--port COMx] [--elf PATH] [--timeout MS] [--sim] <サブコマンド> ...
 ```
 
 - `--port` 省略時は VID 0483 / PID 5740 のポートを自動検出する（複数あれば一覧を表示してエラー、無ければエラー）。
+- `--sim` を付けると実機の代わりに擬似デバイス（シミュレータ、`nemadbg/sim.py`）を使う。ポート検出はしない（`--port` は無視）。状態は実行ごとに初期化され、電源投入後 200 ms 経った状態（DISABLED、VM 24 V、25 ℃）で始まる。全サブコマンドが動く（`dfu` は ENTER_BOOTLOADER の受付まで）。詳細は下の「シミュレータ」。
 - `--timeout` は応答待ち [ms]（既定 200）。タイムアウトしたらフレームごとに最大 3 回再送する。ただし `can-req` の書き込み（OP 0x01）とブロードキャスト（CAN_ID 0x000）は二重実行を防ぐため再送せず、タイムアウトしたら「実行されたかは不明」と表示する（`regs` で状態を確認する）。
 - 共通オプションはサブコマンドの前後どちらにも書ける。
 - どのサブコマンドも終了時に DISCONNECT を送る。ただし `dfu` は、移行すると COM ポートが消えるため DISCONNECT を送らない。
@@ -69,6 +70,46 @@ python -m nemadbg events --duration 30
 
 `regs` と `can-req` の BOARD_ID は CONNECT 応答から得る。`regs` は 6 B ずつ読み出してから、全体が範囲に入るレジスタだけを表示する。
 
+## シミュレータ（`--sim`）
+
+実機がなくても CLI や PC 側 GUI を試せる USB 擬似デバイス。標準ライブラリだけで動き、プロトコル・レジスタ・状態遷移・コマンドの受付条件は `docs/usb_interface.md`、名前表は `docs/usb_symbols.md` と `App/Src/*.c` 末尾の `SYM_ENTRY`（104 件）に合わせてある。
+
+```powershell
+python -m nemadbg --sim info
+python -m nemadbg --sim regs
+python -m nemadbg --sim watch position --interval 0.2 --count 5
+python -m nemadbg --sim can-req 0x103 015001      # ENABLE（BOARD_ID は 3）
+```
+
+CLI は 1 回の実行ごとに別のシミュレータになるので、状態は次の実行に残らない。連続した操作は Python から使う。
+
+```python
+from nemadbg.link import Link
+from nemadbg.sim import SimSerial
+
+sim = SimSerial(board_id=3)          # clock=time.monotonic、noise=True、seed=None が既定
+link = Link(sim)
+link.connect()
+sim.set_vm_mv(5000)                  # 注入 API: VM 低下 -> FAULT とイベント
+```
+
+- `SimSerial` は serial 互換（`write` / `read(size)` / `in_waiting` / `close`）。`read` はデータが無いとき最大 `timeout`（既定 0.02 s）だけ待つ。
+- 内部状態は、要求・`read`・公開 API が呼ばれたときに、前回からの経過時間ぶんを 1 ms 刻みで進める（一度に最大 10 s）。時計は `SimSerial(clock=...)` で差し替えられ、偽の時計のときは実時間で待たない（`tests/test_sim.py`）。
+- スレッド安全（Lock で保護）。GUI スレッドから注入 API を呼べる。
+- 注入 API: `set_vm_mv`、`set_board_temp_c` / `set_board_temp_dc`（`None` は NTC 断線）、`set_ad_in_mv`、`inject_fault(0x01 OPD / 0x02 ISD / 0x04 TSD)`、`set_home_switches(home1_pos, home2_pos)`（`None` はスイッチ無し）、`set_home_travel_limit`、`set_sensor_present`、`set_shaft_offset`、`set_switches`、`set_external_5v`、`set_save_fails`、`unplug()` / `replug()`、`reboot()`、`drop_responses`（>0 で先頭からその数だけ応答を捨てる、<0 で以後すべて。タイムアウト試験用）。
+- `unplug()` 後の `write` / `read` は `SimUnplugged`（`OSError`）を投げる。`replug()` で CONNECT 状態が解除され、最初の要求は ERR 0x35 になる。`ENTER_BOOTLOADER` を受け付けた後も同様にポートが消え、`replug()` で電源再投入相当に戻る。
+- 名前表のアドレスは疑似 RAM（`0x20000040` 以降）に割り付けてあり、同じ構造体（`mon.*`、`cfg.*`、`sensor.*`、`home.*`、`usb_stats.*` など）は連続している。`cfg`・`comm_stats`・`usb_stats` の全体登録は各フィールドと同じ領域を指す。ファームに名前を足すと `tests/test_sim.py` の名前表の照合が落ちるので、`sim.py` の `_GROUPS` に追加する。
+
+### 簡略化した点（実機との違い）
+
+- パルスは 1 個ずつ出さず、速度の積分で位置を進める。加減速は時間基準の台形（START_SPEED から ACCEL、MAX_SPEED で頭打ち、DECEL で停止）で、ファームのステップ単位のプランナとは数 step ずれる。位置決めは目標に着いたら即停止する。
+- ローカルジョグ（SW1/SW2）は再現しない（STATUS の bit3/bit4 を注入できるだけ）。
+- 位置センサ AS5600 は位置から算出する（`SENSOR_RAW = (出力軸角度 + SENSOR_OFFSET)`、軸角度は `POSITION + set_shaft_offset の値` を 1 回転分の step 数で割った剰余）。DIR による反転と I2C 異常は再現しない。起動後 10 ms で有効になり、自動で SYNCED になる。
+- 原点復帰は `home.c` の移植。HOME1/HOME2 は片側無限のスイッチ（既定は POSITION >= +20000 で HOME1、<= -20000 で HOME2）。スイッチが無い側へ 100000 step 動くと失敗にする（実機は機械端まで動き続ける）。
+- `ENC_COUNT`（J10_MODE=1）は位置に追従する。CAN バスは持たず `comm_stats.*` は常に 0。送信詰まり（50 ms）と SAVE_SETTINGS の応答遅れ（約 25 ms）は再現しない。
+- 保存設定はプロセス内のメモリ（既定は保存済みの工場値から始まる。`blank_flash=True` で未保存）。基板温度・MCU 温度・VM には小さな揺らぎが付く（`noise=False` で無効、`seed` で再現可能）。
+- `loop.*`・`stack.*` はそれらしい固定値。`reset_csr` は電源投入相当（BORRSTF | PINRSTF）。
+
 ## 終了コード
 
 | コード | 意味 |
@@ -81,7 +122,7 @@ python -m nemadbg events --duration 30
 
 ## テスト
 
-ハードウェア不要。擬似デバイス（`tests/fakedevice.py`）で動かす。
+ハードウェア不要。擬似デバイス（`tests/fakedevice.py`）とシミュレータ（`tests/test_sim.py`）で動かす。
 
 ```powershell
 python -m unittest discover -s tests

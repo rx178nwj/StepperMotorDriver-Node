@@ -78,6 +78,10 @@ def resolve_port(args: argparse.Namespace) -> str:
 
 
 def default_link_factory(args: argparse.Namespace) -> Link:
+    if getattr(args, "sim", False):
+        from .sim import SimSerial   # 実機を使わないときだけ読み込む
+
+        return Link(SimSerial(warmup_ms=200), timeout_s=args.timeout / 1000.0)
     port = resolve_port(args)
     try:
         ser = open_serial(port)
@@ -309,6 +313,8 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
     common.add_argument("--port", help="COM ポート（省略時は VID 0483 / PID 5740 を自動検出）")
     common.add_argument("--elf", help="ELF ファイル")
+    common.add_argument("--sim", action="store_true",
+                        help="実機の代わりに擬似デバイス（シミュレータ）を使う（ポート検出をしない。状態は実行ごとに初期化）")
     common.add_argument("--timeout", type=int, help=f"応答待ち [ms]（既定 {int(DEFAULT_TIMEOUT_S * 1000)}）")
 
     ap = _Parser(prog="nemadbg", description="NEMA23 ステッピングモータドライバの USB CDC デバッグツール",
@@ -352,6 +358,7 @@ def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any]
     args.elf = getattr(args, "elf", None)
     args.timeout = getattr(args, "timeout", int(DEFAULT_TIMEOUT_S * 1000))
     args.yes = getattr(args, "yes", False)
+    args.sim = getattr(args, "sim", False)
     args.prompt = prompt
     args.dfu_tools = dfu_tools or dfu_mod.DfuTools()
     args.no_disconnect = False   # dfu は移行後に COM ポートが消えるため DISCONNECT を送らない
