@@ -127,3 +127,35 @@ sim.set_vm_mv(5000)                  # 注入 API: VM 低下 -> FAULT とイベ�
 ```powershell
 python -m unittest discover -s tests
 ```
+
+# nemagui
+
+`nemadbg` と同じ USB CDC で基板につなぐ PC 側のデバッグ GUI（PySide6）。現状は画面の骨格（G2）で、接続・状態概要・非常停止・内部状態の項目表・ログ・統計までを備える。操作タブ・設定タブ・グラフは今後実装する（タブはプレースホルダ）。
+
+## インストールと起動
+
+```powershell
+.venv\Scripts\python -m pip install -r requirements-gui.txt   # PySide6 と pyqtgraph（pyserial・pyelftools も入る）
+.venv\Scripts\python -m nemagui [--port COMx] [--sim] [--timeout MS]
+```
+
+- `--port` を省略すると VID 0483 / PID 5740 のポートを探して、上部のコンボに並べる。1 つなら自動で選んで接続し、複数あれば選ばせる（「再検索」で探し直し）。`--port` 指定時はそのポートに固定する。
+- `--sim` は擬似デバイス（`nemadbg/sim.py`）につなぐ。右側に「シミュレータ」ドックが出て、VM・基板温度（NTC 断線）・FAULT 注入（OPD/ISD/TSD）・HOME スイッチ位置・ケーブル抜去／再接続・基板の再起動・応答を捨てる回数を操作できる。
+- `--timeout` は応答待ち [ms]（既定 200）。切断されると 1 秒ごとに自動で再接続を試みる（「切断」ボタンで止まる）。
+- ウィンドウの位置・サイズ・最後のタブは QSettings に保存する。
+
+## 画面
+
+- 左: ESTOP（非常停止）・STOP（減速停止）と、常時表示の状態概要（STATE の色、FAULT / STATUS / INPUT_STATUS / CONFIG_STATUS のビットランプ、位置・速度・VM・温度など）。切断中はグレーアウトする。
+- 中央のタブ: 内部状態（モーション・状態遷移・監視・センサ・J10・原点・通信統計・診断・その他）の項目表。表示中のタブの項目だけを読む。累積カウンタは値の横に `+N/s` を出す。
+- 下: ログ（接続・切断・異常通知・書き込み結果・注意。最大 5000 行）。ステータスバーに通信統計。
+
+## ショートカット
+
+| キー | 動作 |
+|---|---|
+| `Esc` / `Space` | ESTOP（どのウィジェットにフォーカスがあっても有効。ただしテキスト入力欄での Space は入力として扱われる） |
+
+## テスト
+
+`tests/test_gui_qt.py` は `QT_QPA_PLATFORM=offscreen` で動く（PySide6 が無ければスキップ）。画面を介さない表示ロジックは `nemagui/viewstate.py` にあり `tests/test_gui_viewstate.py` で試験する。
