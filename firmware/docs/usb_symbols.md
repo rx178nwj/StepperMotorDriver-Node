@@ -7,7 +7,7 @@ INDEX はリンク順で決まるため版ごとに変わる。PC は SYM_FIND�
 TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列（NUM = バイト数）。サイズ = 要素サイズ × NUM。
 8 バイト以下の変数は割り込みを禁止してコピーする。それより大きい変数（`cfg`・`comm_stats`・`usb_stats`）は 32bit 単位のコピーで、フィールド間の同時性は保証しない。
 
-登録数は 79（2026-10-18 時点。`arm-none-eabi-size -A` の `.sym_table` ÷ 12 で確認できる）。
+登録数は 97（2026-10-24 時点。`arm-none-eabi-size -A` の `.sym_table` ÷ 12 で確認できる）。
 
 ## 状態遷移（`App/Src/app.c`）
 
@@ -81,6 +81,7 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `cfg.gear_ratio` | u16 | ギヤ比（0x54） |
 | `cfg.sensor_offset` | u16 | センサ原点オフセット（0x56） |
 | `cfg.pa7_mode` | u8 | PA7 の機能（0x58）。0 AD_IN、1 DIR、2 Z |
+| `cfg.j10_mode` | u8 | J10 の機能 J10_MODE（0x59）。0 未使用、1 ENC、2 HOME |
 
 ## 位置センサ AS5600（`App/Src/position.c`、`App/Src/app.c`、要求仕様 3.10 節 FR-POS-10）
 
@@ -95,6 +96,30 @@ TYPE：1 u8、2 i8、3 u16、4 i16、5 u32、6 i32、7 f32、0x10 バイト列�
 | `pa7_applied` | u8 | PA7 に実際に設定している機能（0 AD_IN、1 DIR、2 Z） |
 | `sensor_status` | u8 | SENSOR_STATUS レジスタ（10 ms 周期のスナップショット。実体は `sensor_status_snapshot`） |
 | `shaft_angle` | u16 | SHAFT_ANGLE レジスタ [0.01°]（10 ms 周期のスナップショット。無効時 0xFFFF。実体は `shaft_angle_snapshot`） |
+
+## J10・原点復帰・AGC（`App/Src/app.c`、`App/Src/j10.c`、要求仕様 3.12 節）
+
+USB のメモリ読み出しはペリフェラル領域（TIM2・GPIO）を読めない（FR-USB-31）。端子・TIM2 を読む値や関数で組み立てる値は、周期処理で RAM に写したスナップショットを登録している。
+
+| 名前 | TYPE | 内容 |
+|---|---|---|
+| `input_status` | u8 | INPUT_STATUS レジスタ（0x1E）と同じ値（1 ms 周期のスナップショット）。bit0 HOME1 作動、1 HOME2 作動、2 原点復帰中、3 原点復帰完了、4 原点復帰失敗、5 リミット停止 |
+| `enc_count` | i32 | ENC_COUNT レジスタ（0x5C）と同じ値（1 ms 周期のスナップショット。TIM2->CNT。J10_MODE≠1 のときは 0） |
+| `agc_out` | u8 | AGC0/AGC1 端子の出力レベル（10 ms 周期のスナップショット。`drv_get_agc()`。1 = 両方 High） |
+| `limit_stopped` | u8 | INPUT_STATUS bit5 の元（リミットで停止した。次に受け付けた移動指令で 0） |
+| `home.state` | u8 | 原点復帰の状態。0 IDLE、1 SEEK、2 SEEK_STOP、3 BACK、4 BACK_STOP、5 DONE、6 FAILED |
+| `home.side` | i8 | 原点復帰の指定側。+1 = HOME1（HOME_POS）、-1 = HOME2（HOME_NEG） |
+| `home.seek_speed` | i32 | 探索速度 [step/s]（正） |
+| `home.back_speed` | i32 | 戻り速度 [step/s]（正） |
+| `home.limit_steps` | u32 | 戻りで動いてよい上限 [step] |
+| `home.start_pos` | i32 | 戻りを始めた位置 [step] |
+| `home.opp_prev` | u8 | 前回の反対側の入力（SEEK で反対側が新たに作動したことの検出用） |
+| `hm1.active` | u8 | HOME1 の確定した作動状態（J10_MODE=2 のときだけ。デバウンス後） |
+| `hm1.cand` | u8 | HOME1 の直近のサンプル（作動 = 1。デバウンス中の生の値） |
+| `hm1.count` | u8 | HOME1 のサンプルが連続した回数（確定は `HOME_CONFIRM_SAMPLES` 回） |
+| `hm2.active` | u8 | HOME2 の確定した作動状態 |
+| `hm2.cand` | u8 | HOME2 の直近のサンプル |
+| `hm2.count` | u8 | HOME2 のサンプルが連続した回数 |
 
 ## CAN 統計（`App/Src/comm.c`）
 

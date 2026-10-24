@@ -46,10 +46,42 @@ STM32L433CCU6 + TB67S249FTG。開発環境は STM32CubeMX ＋ VS Code（ST 公�
 
 1. VS Code でこのフォルダ（`driver_fw`）を開く。ST 拡張が CMake プロジェクトとして認識し、必要なツール（GCC 等）を取得する。
 2. ビルド：CMake の構成で `Debug` または `Release` プリセットを選んでビルド（出力は `build/<preset>/driver_fw.elf`）。
-3. 書き込み：
-   - ST-LINK：拡張のデバッグ起動、またはタスク「Flash (ST-LINK) - Debug」
-   - USB：S3（BOOT0）を押したまま S1（リセット）→ タスク「Flash (USB DFU) - …」
+3. 書き込み：[書き込み方法](#書き込み方法) の 3 通りのいずれか
 4. 初回だけ：タスク「Read bootloader version ID (ST-LINK)」でブートローダ版 ID を確認（0x10 なら USB DFU は問題なし。0xFF は AN2606 記載の CRS 不具合あり）。
+
+## 書き込み方法
+
+1. ST-LINK（SWD）：拡張のデバッグ起動、またはタスク「Flash (ST-LINK) - Debug」
+2. `nemadbg dfu`（ボタン操作なし）：USB 経由の ENTER_BOOTLOADER で ROM ブートローダ（USB DFU）へ移り、USB で書き込む（要求仕様 FR-BL-01）
+3. 従来の手順：S3（BOOT0）を押したまま S1（リセット）で DFU に入り、タスク「Flash (USB DFU) - …」で書き込む
+
+### `nemadbg dfu` による書き込み
+
+1. 基板を DISABLE（励磁 OFF）にする（ENABLED 中の ENTER_BOOTLOADER は ERR 0x33 で拒否される）。
+2. `firmware/tools` で `python -m nemadbg dfu` を実行する（確認を省くときは `--yes`）。COM ポートが消え、DFU デバイス（0483:DF11）が現れる。`STM32_Programmer_CLI` が PATH にあれば nemadbg が列挙を待って結果を表示する（PATH に無ければこの検出は省かれる）。詳細は [tools/README.md](tools/README.md)。
+3. DFU デバイスが現れたら書き込み・起動する（`firmware` で実行）。
+
+   ```
+   STM32_Programmer_CLI -c port=usb1 -w build/Release/driver_fw.elf -v -g 0x08000000
+   ```
+
+   `STM32_Programmer_CLI` は `%LOCALAPPDATA%\stm32cube\bundles\programmer\<版>\bin\` にある（版は「固定しているバージョン」の表と `.vscode/tasks.json` のパスに合わせる）。
+
+### 設定領域を消さないこと
+
+設定保存領域（0x0803F000〜0x0803FFFF、FR-NV-02）を消さないため、全消去（`-e all`）やマスイレースはしない。`-w` は書き込む範囲のセクタだけを消去するので、設定は残る（`.vscode/tasks.json` の注記と同じ）。
+
+### 安全上の注意
+
+ROM ブートローダ実行中の DRV_EN などの端子レベルは、実機で確認するまで確定していない（FR-BL-07、H-14）。確認するまでは、DFU での書き込みは VM（モータ電源）を切って行う。
+
+### 実機で確認すべき点（試験 37・38、U-17）
+
+- `nemadbg dfu` の後に DFU デバイス（0483:DF11）が現れること
+- 書き込み・起動の後に通常起動に戻り、保存してあった設定が残っていること
+- DFU 中に IWDG でリセットされないこと。オプションバイトの IWDG_SW が 1（ソフトウェア起動）であること。0 だとリセット直後から IWDG が動き、DFU 中にリセットされる
+- ROM ブートローダの版（0x1FFF6FF2。タスク「Read bootloader version ID (ST-LINK)」）
+- ROM ブートローダ中の DRV_EN などの端子レベル（上の安全上の注意）
 
 ## 固定しているバージョン（2026-10-11 時点）
 

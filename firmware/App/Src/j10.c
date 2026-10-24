@@ -141,3 +141,11 @@ bool j10_home2_active(void)
 {
     return hm2.active;
 }
+
+/* USB 名前表（RAM 上の変数なので直接登録できる。TIM2->CNT と端子は app.c のスナップショット経由） */
+SYM_ENTRY(hm1.active, SYM_U8, 1);   /* HOME1 の確定した作動状態 */
+SYM_ENTRY(hm1.cand, SYM_U8, 1);     /* HOME1 の直近のサンプル（作動 = 1。デバウンス中の生レベル） */
+SYM_ENTRY(hm1.count, SYM_U8, 1);    /* HOME1 のサンプルが連続した回数 */
+SYM_ENTRY(hm2.active, SYM_U8, 1);
+SYM_ENTRY(hm2.cand, SYM_U8, 1);
+SYM_ENTRY(hm2.count, SYM_U8, 1);

@@ -45,6 +45,11 @@ static monitor_values_t mon = { .vdda_mv = 3300u, .board_temp_dc = TEMP_INVALID,
 /* J10（3.12 節）。INPUT_STATUS レジスタ（0x1E）と ENC_COUNT（0x5C）は読み出しのたびに作る */
 static home_t home;                /* 原点復帰の状態機械（home.c） */
 static bool limit_stopped;         /* INPUT_STATUS bit5: リミットで停止した（次に受け付けた移動指令で 0） */
+/* USB のメモリ読み出しはペリフェラル領域を読めない（FR-USB-31）ので、端子・TIM2 を読む値と関数で組み立てる値は
+ * 周期処理で RAM に写して名前表で公開する */
+static uint8_t input_status_snapshot;   /* INPUT_STATUS レジスタ（0x1E）の値。1 ms 周期（home 状態機械・HOME 入力と同じ周期） */
+static int32_t enc_count_snapshot;      /* ENC_COUNT レジスタ（0x5C）の値。TIM2->CNT を 1 ms 周期で写す */
+static uint8_t agc_snapshot;            /* AGC0/AGC1 の出力レベル（1 = 両方 High）。GPIO の ODR を 10 ms 周期で写す（変わるのは EN=Low の間だけ） */
 
 static bool vm_ok;
 static uint32_t vm_good_ms;
@@ -780,6 +785,8 @@ void app_tick_1ms(uint32_t now_ms)
     handle_switches();
     handle_motion();
     handle_limit_and_home();
+    input_status_snapshot = input_status_bits();
+    enc_count_snapshot = j10_enc_count();
 
     ui_view_t v = {
         .enabled = state == APP_ENABLED,
@@ -813,6 +820,7 @@ void app_tick_10ms(uint32_t now_ms)
     }
     sensor_status_snapshot = sensor_status_bits();
     shaft_angle_snapshot = position_shaft_angle(position_raw(), cfg.sensor_offset);
+    agc_snapshot = drv_get_agc() ? 1u : 0u;
 
     /* VM 判定（ヒステリシス + 連続回数） */
     uint32_t lo = vm_ok ? VM_OK_MIN_MV : VM_OK_MIN_MV + VM_HYST_MV;
@@ -900,7 +908,21 @@ SYM_ENTRY(cfg.steps_per_rev, SYM_U16, 1);
 SYM_ENTRY(cfg.gear_ratio, SYM_U16, 1);
 SYM_ENTRY(cfg.sensor_offset, SYM_U16, 1);
 SYM_ENTRY(cfg.pa7_mode, SYM_U8, 1);
+SYM_ENTRY(cfg.j10_mode, SYM_U8, 1);
 
 /* 位置センサ（実体は position.c の sensor.* と pa7_applied も参照） */
 SYM_ENTRY_AS("sensor_status", sensor_status_snapshot, SYM_U8, 1);   /* SENSOR_STATUS レジスタ（10 ms 周期） */
 SYM_ENTRY_AS("shaft_angle", shaft_angle_snapshot, SYM_U16, 1);      /* SHAFT_ANGLE レジスタ [0.01°]（10 ms 周期） */
+
+/* J10（3.12 節）。HOME 入力のデバウンス状態は j10.c の hm1.* / hm2.* も参照 */
+SYM_ENTRY_AS("input_status", input_status_snapshot, SYM_U8, 1);   /* INPUT_STATUS レジスタ（1 ms 周期） */
+SYM_ENTRY_AS("enc_count", enc_count_snapshot, SYM_I32, 1);        /* ENC_COUNT レジスタ（1 ms 周期。J10_MODE≠1 は 0） */
+SYM_ENTRY_AS("agc_out", agc_snapshot, SYM_U8, 1);                 /* AGC 端子の出力レベル（10 ms 周期。1 = 両方 High） */
+SYM_ENTRY(limit_stopped, SYM_U8, 1);
+SYM_ENTRY(home.state, SYM_U8, 1);          /* home_state_t: 0 IDLE、1 SEEK、2 SEEK_STOP、3 BACK、4 BACK_STOP、5 DONE、6 FAILED */
+SYM_ENTRY(home.side, SYM_I8, 1);
+SYM_ENTRY(home.seek_speed, SYM_I32, 1);
+SYM_ENTRY(home.back_speed, SYM_I32, 1);
+SYM_ENTRY(home.limit_steps, SYM_U32, 1);
+SYM_ENTRY(home.start_pos, SYM_I32, 1);
+SYM_ENTRY(home.opp_prev, SYM_U8, 1);
