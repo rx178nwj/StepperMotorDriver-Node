@@ -256,5 +256,43 @@ class WriteLabelTest(unittest.TestCase):
         self.assertEqual(self.label(addr, 900), "書き込み RUN_CURRENT = 900 mA: OK")
 
 
+class AngleTest(unittest.TestCase):
+    TOTAL = (1, 200, 16)   # 3200 step/rev
+
+    def angle(self, pos):
+        return sm.motor_angle_deg(pos, *self.TOTAL)
+
+    def test_normalize(self) -> None:
+        self.assertEqual(self.angle(0), 0.0)
+        self.assertEqual(self.angle(800), 90.0)
+        self.assertEqual(self.angle(1600), 180.0)
+        self.assertEqual(self.angle(3199), 3199 / 3200 * 360.0)
+        self.assertEqual(self.angle(3200), 0.0)            # ちょうど 1 回転で 0
+        self.assertEqual(self.angle(3200 * 5 + 800), 90.0)  # 累積値
+
+    def test_negative(self) -> None:
+        self.assertEqual(self.angle(-800), 270.0)
+        self.assertEqual(self.angle(-3200), 0.0)
+        self.assertEqual(self.angle(-1), 3199 / 3200 * 360.0)
+
+    def test_gear_ratio(self) -> None:
+        self.assertEqual(sm.motor_angle_deg(3200, 2, 200, 16), 180.0)
+
+    def test_unknown(self) -> None:
+        self.assertIsNone(sm.motor_angle_deg(None, 1, 200, 16))
+        self.assertIsNone(sm.motor_angle_deg(0, None, 200, 16))
+        self.assertIsNone(sm.motor_angle_deg(0, 1, None, 16))
+        self.assertIsNone(sm.motor_angle_deg(0, 1, 200, None))
+        self.assertIsNone(sm.motor_angle_deg(0, 0, 200, 16))
+        self.assertIsNone(sm.motor_angle_deg(0, 1, 200, 0))
+
+    def test_diff(self) -> None:
+        self.assertEqual(sm.angle_diff_deg(10.0, 350.0), 20.0)
+        self.assertEqual(sm.angle_diff_deg(350.0, 10.0), -20.0)
+        self.assertEqual(sm.angle_diff_deg(180.0, 0.0), -180.0)
+        self.assertIsNone(sm.angle_diff_deg(None, 1.0))
+        self.assertIsNone(sm.angle_diff_deg(1.0, None))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -171,6 +171,30 @@ def fail_streak_text(streak: Optional[int]) -> Tuple[str, str]:
     return str(s), (ORANGE if s else GREEN)
 
 
+# ---------------------------------------------------------------- 角度ダイヤル
+
+def motor_angle_deg(position: Optional[int], gear_ratio: Optional[int], steps_per_rev: Optional[int],
+                    microstep: Optional[int]) -> Optional[float]:
+    """POSITION [step]（符号付き・累積）から出力軸の角度 [°]（0 以上 360 未満）を求める。
+
+    1 回転のステップ数は GEAR_RATIO × STEPS_PER_REV × MICROSTEP（position.c の position_sync_steps と同じ）。
+    どれかが不明または 0 以下なら None。
+    """
+    if position is None or gear_ratio is None or steps_per_rev is None or microstep is None:
+        return None
+    total = int(gear_ratio) * int(steps_per_rev) * int(microstep)
+    if total <= 0:
+        return None
+    return (int(position) % total) / total * 360.0
+
+
+def angle_diff_deg(a: Optional[float], b: Optional[float]) -> Optional[float]:
+    """a − b を −180 以上 180 未満に丸めた差 [°]。どちらかが None なら None。"""
+    if a is None or b is None:
+        return None
+    return (float(a) - float(b) + 180.0) % 360.0 - 180.0
+
+
 # ---------------------------------------------------------------- J10・原点復帰
 
 HOME_CONFIRM_SAMPLES = 2       # App/Inc/config.h の HOME_CONFIRM_SAMPLES（HOME 入力の確定に必要な連続一致回数）

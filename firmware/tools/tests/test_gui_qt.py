@@ -411,6 +411,24 @@ class WindowTest(unittest.TestCase):
         self.assertEqual(self.win.log.document().defaultFont().toString(), self.win.log.font().toString())
 
 
+    def test_angle_dial(self) -> None:
+        dial = self.win.overview.dial
+        self.assertIsNone(dial.motor_angle)
+        self.assertIsNone(dial.sensor_angle)
+        self.connect_up()
+        self.wait_for(lambda: dial.motor_angle is not None and dial.sensor_angle is not None)
+        self.assertTrue(0.0 <= dial.motor_angle < 360.0)
+        self.assertTrue(0.0 <= dial.sensor_angle < 360.0)
+        self.assertIn("reg.GEAR_RATIO", self.win.worker._polls["overview"][0])
+        img = dial.grab().toImage()                                       # 描画のスモーク
+        self.assertFalse(img.isNull())
+        self.assertGreater(img.width(), 0)
+        self.win.overview.refresh(None)
+        self.assertIsNone(dial.motor_angle)
+        self.assertIsNone(dial.sensor_angle)
+        dial.set_angles(90.0, None)                                       # 片方だけでも描ける
+        self.assertFalse(dial.grab().toImage().isNull())
+
     # ---- G4: 要点パネル・名前表ブラウザ・ウォッチ ----
 
     def open_group(self, group: str):

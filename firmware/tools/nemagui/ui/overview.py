@@ -8,9 +8,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QGridLayout, QGroupBox, QLabel, QVBoxLayout, QWidget
 
 from .. import items as itemsmod
+from .. import summary as sm
 from .. import viewstate as vs
 from ..items import Item
 from ..model import Model
+from .angle_dial import AngleDial
 
 _OFF_STYLE = "color:#8a8a8a;background:#ececec;border:1px solid #d0d0d0;border-radius:3px;padding:1px 4px;"
 
@@ -71,9 +73,13 @@ _ROWS: List[Tuple[str, str]] = [
 ]
 
 
+# 行は出さないが、モーター角度の換算（1 回転のステップ数）に必要なのでポーリングだけ行う設定
+_DIAL_KEYS: List[str] = ["reg.GEAR_RATIO", "reg.STEPS_PER_REV", "reg.MICROSTEP"]
+
+
 def overview_keys() -> List[str]:
-    """概要パネルが表示する項目の key（"overview" ポーリング用）。"""
-    return [k for k, _ in _ROWS]
+    """概要パネルが読む項目の key（"overview" ポーリング用）。表示行に加えて角度ダイヤル用の設定を含む。"""
+    return [k for k, _ in _ROWS] + _DIAL_KEYS
 
 
 class OverviewPanel(QGroupBox):
@@ -106,8 +112,10 @@ class OverviewPanel(QGroupBox):
             self._widgets[key] = w
             grid.addWidget(name, row, 0)
             grid.addWidget(w, row, 1)
+        self.dial = AngleDial()
+        grid.addWidget(self.dial, len(_ROWS), 0, 1, 2)
         grid.setColumnStretch(1, 1)
-        grid.setRowStretch(len(_ROWS), 1)
+        grid.setRowStretch(len(_ROWS) + 1, 1)
         self.refresh(None)
 
     def _set_text(self, key: str, text: str) -> None:
@@ -135,3 +143,13 @@ class OverviewPanel(QGroupBox):
                 self._set_text(key, vs.format_vm(None if value is None else float(value)))
             else:
                 self._set_text(key, "—" if value is None else itemsmod.format_value(self._items[key], value))
+        self._refresh_dial(model)
+
+    def _refresh_dial(self, model: Optional[Model]) -> None:
+        if model is None:
+            self.dial.set_angles(None, None)
+            return
+        motor = sm.motor_angle_deg(model.value("reg.POSITION"), model.value("reg.GEAR_RATIO"),
+                                   model.value("reg.STEPS_PER_REV"), model.value("reg.MICROSTEP"))
+        sensor = model.value("reg.SHAFT_ANGLE")
+        self.dial.set_angles(motor, None if sensor is None else float(sensor))
