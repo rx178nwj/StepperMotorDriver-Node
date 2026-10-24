@@ -55,6 +55,7 @@ set(APP_SOURCES
     App/Src/board.c
     App/Src/bootjump.c
     App/Src/comm.c
+    App/Src/diag.c
     App/Src/drv.c
     App/Src/home.c
     App/Src/j10.c

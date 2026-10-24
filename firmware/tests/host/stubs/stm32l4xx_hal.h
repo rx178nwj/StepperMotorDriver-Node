@@ -22,6 +22,8 @@ typedef struct {
     uint32_t Pin, Mode, Pull, Speed, Alternate;
 } GPIO_InitTypeDef;
 
+extern volatile uint32_t uwTick;   /* diag.c が名前表に登録する。実体は試験側 */
+
 extern GPIO_TypeDef g_gpioa, g_gpiob, g_gpioc, g_gpioh;
 #define GPIOA (&g_gpioa)
 #define GPIOB (&g_gpiob)

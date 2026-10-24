@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "app_main.h"
 #include "bootjump.h"
+#include "diag.h"
 
 /* USER CODE END Includes */
 
@@ -45,6 +46,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern uint8_t _end;     /* リンカスクリプト: .bss/.noinit の終端（スタック塗りつぶしの下端） */
+extern uint8_t _estack;  /* RAM の上端（スタックの上端） */
 
 /* USER CODE END PV */
 
@@ -84,6 +87,10 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  diag_set_reset_csr(RCC->CSR);        /* リセット要因（診断値）。次回のリセット要因と区別するためクリアする */
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+  /* 現在の SP より 512 バイト下までを塗る（SysTick 割り込みのフレームが limit より上に収まる余裕） */
+  diag_stack_init((uint32_t *)&_end, (uint32_t *)(__get_MSP() - 512u), (uint32_t *)&_estack);
 
   /* USER CODE END SysInit */
 

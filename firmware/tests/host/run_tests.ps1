@@ -6,6 +6,7 @@
 #   test_comm     : comm.c（CAN 通信層。app の関数は test_comm.c 内の偽物、HAL の CAN はスタブ）
 #   test_app      : app.c のレジスタ処理（app_reg_read / app_reg_write。settings.c・j10.c・home.c は実物、stepper・drv などは test_app.c 内の偽物）
 #   test_home     : home.c（原点復帰の状態機械。ハードウェアに触れない純粋な関数）
+#   test_diag     : diag.c（診断値。リセット要因・ループ周期・スタック使用量。diag.c を #include して static 変数を直接見る）
 #   test_j10      : j10.c（PA15/PA1 の切り替え・エンコーダ・HOME 入力。GPIOA・TIM2 はスタブのレジスタの実体）
 # 必要なもの: gcc（MinGW-w64 / MSYS2 / Linux の gcc など。GNU 拡張のインラインアセンブラを使うため gcc 系）。
 # FW 本体の ARM ビルド（firmware/CMakeLists.txt）とは独立。成果物は build/ に出る。
@@ -79,8 +80,14 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     -o "$out\test_bootjump.exe"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# diag.c（test_diag.c が diag.c を #include する）
+& $cc @common @inc `
+    "$here\test_diag.c" `
+    -o "$out\test_diag.exe"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $rc = 0
-foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings', 'test_comm', 'test_app', 'test_home', 'test_j10', 'test_bootjump') {
+foreach ($t in 'test_usb', 'test_position', 'test_stepper', 'test_settings', 'test_comm', 'test_app', 'test_home', 'test_j10', 'test_bootjump', 'test_diag') {
     Write-Host "=== $t"
     & "$out\$t.exe"
     if ($LASTEXITCODE -ne 0) { $rc = $LASTEXITCODE }

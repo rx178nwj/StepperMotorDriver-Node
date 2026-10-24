@@ -10,6 +10,7 @@
 #include "board.h"
 #include "bootjump.h"
 #include "config.h"
+#include "diag.h"
 #include "drv.h"
 #include "monitor.h"
 #include "stepper.h"
@@ -44,6 +45,7 @@ void app_main_init(void)
     test_poweron_mark(5);
     test_poweron_hold();
     app_init();
+    diag_init(SystemCoreClock / 1000000u);
     watchdog_init();
 
     last_1ms = HAL_GetTick();
@@ -71,8 +73,10 @@ static void bootloader_enter(void)
 void app_main_loop(void)
 {
     uint32_t t = HAL_GetTick();
+    diag_loop_mark(DWT->CYCCNT, t);
     if (t != last_1ms) {
         last_1ms = t;
+        diag_stack_scan(64);
         app_tick_1ms(t);
     }
     if (t - last_10ms >= 10u) {

@@ -540,7 +540,7 @@ DISCONNECT
 | ファイル | 内容 |
 |----------|------|
 | `firmware/docs/requirements.md` 3.8 / 3.9 | 要求仕様（FR-COM、FR-USB） |
-| `firmware/docs/usb_symbols.md` | 名前表（SYM_*）の登録一覧（79 件） |
+| `firmware/docs/usb_symbols.md` | 名前表（SYM_*）の登録一覧（104 件） |
 | `firmware/App/Inc/usb_proto.h` | CMD・ERR・定数の定義 |
 | `firmware/App/Src/usb_proto.c` | フレーム処理の実装 |
 | `firmware/App/Src/comm.c` / `app.c` | CAN 要求処理・レジスタの実装 |
