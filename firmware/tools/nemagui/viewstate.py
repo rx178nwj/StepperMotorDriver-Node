@@ -148,7 +148,7 @@ class TabSpec:
     label: str
     group: Optional[str]      # 項目表のグループ。None なら専用の画面かプレースホルダ
     note: str = ""            # プレースホルダの説明
-    kind: str = ""            # 専用の画面の種類（TAB_OPS / TAB_SETTINGS / TAB_SYMS）またはプレースホルダ（TAB_GRAPH）
+    kind: str = ""            # 専用の画面の種類（TAB_OPS / TAB_SETTINGS / TAB_SYMS / TAB_GRAPH）
 
 
 def tab_specs() -> List[TabSpec]:
@@ -160,7 +160,7 @@ def tab_specs() -> List[TabSpec]:
         if g in labels:
             out.append(TabSpec(labels[g], g))
     out.append(TabSpec("名前表", None, kind=TAB_SYMS))
-    out.append(TabSpec("グラフ", None, "グラフは G5 で実装予定です", TAB_GRAPH))
+    out.append(TabSpec("グラフ", None, kind=TAB_GRAPH))
     return out
 
 

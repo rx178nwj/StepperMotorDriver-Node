@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit,
 
 from nemadbg.link import Link, find_ports, open_serial
 
+from .. import graphmodel as gm
 from .. import items as itemsmod
 from .. import summary as sm
 from .. import viewstate as vs
@@ -21,6 +22,7 @@ from .. import worker as wk
 from ..items import Item
 from ..model import Model
 from .conn_bar import ConnectionBar
+from .graph_tab import GraphTab, SaveDialog
 from .items_table import GroupTable
 from .ops_tab import OpsTab
 from .overview import OverviewPanel, overview_keys
@@ -62,6 +64,7 @@ class AppConfig:
     stats_period_s: float = 1.0
     find_ports: Callable[[], List[str]] = find_ports
     confirm: Optional[Callable[[str, str], bool]] = None   # 設定タブの確認ダイアログ（試験で差し替える）
+    save_dialog: Optional[SaveDialog] = None               # グラフタブの保存先ダイアログ（試験で差し替える）
 
 
 class MainWindow(QMainWindow):
@@ -86,6 +89,7 @@ class MainWindow(QMainWindow):
                                     sm.clamp_watch_period(self._settings.value("watch/period_s", sm.WATCH_PERIOD_S)),
                                     self)
         self.watch_dock.changed.connect(self._on_watch_changed)
+        self.graph_tab.set_watch_keys(self.watch_dock.keys())
         self.watch_dock.period_changed.connect(lambda _p: self._apply_watch_poll())
         self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
         if config.sim is not None:
@@ -193,6 +197,10 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self._specs = vs.tab_specs()
         self.sym_browser = SymBrowser(self.worker.send)
+        self.graph_tab = GraphTab(self.model, self._items, self._config.save_dialog)
+        self.graph_tab.poll_changed.connect(self._apply_graph_poll)
+        self.graph_tab.recording_changed.connect(lambda _r: self._apply_graph_poll())
+        self.graph_tab.rec_status_changed.connect(self._on_rec_status)
         self._tables: Dict[str, GroupTable] = {}
         self._panels: Dict[str, SummaryPanel] = {}
         for spec in self._specs:
@@ -202,6 +210,8 @@ class MainWindow(QMainWindow):
                 w = self.settings_tab
             elif spec.kind == vs.TAB_SYMS:
                 w = self.sym_browser
+            elif spec.kind == vs.TAB_GRAPH:
+                w = self.graph_tab
             elif spec.group is None:
                 w = QLabel(spec.note)
                 w.setAlignment(Qt.AlignCenter)
@@ -266,6 +276,10 @@ class MainWindow(QMainWindow):
 
         self.stats_label = QLabel("")
         self.statusBar().addWidget(self.stats_label, 1)
+        self.rec_label = QLabel("")
+        self.rec_label.setStyleSheet("color:#d32f2f;font-weight:bold;")
+        self.rec_label.setVisible(False)
+        self.statusBar().addPermanentWidget(self.rec_label)
 
     def _build_shortcuts(self) -> None:
         # どのウィジェットにフォーカスがあっても効くようにアプリケーション全体で受ける
@@ -337,6 +351,22 @@ class MainWindow(QMainWindow):
                 self._panels[g].refresh(self.model)
         else:
             self.worker.clear_poll(vs.TAB_POLL)
+        self._apply_graph_poll()
+
+    def _apply_graph_poll(self) -> None:
+        """ポーリング組 "graph"。グラフタブの表示中、または CSV 記録中に、選択中の系列を読む。
+
+        タブを離れても記録中なら続ける。表示も記録もなければ、または系列が空なら外す。
+        """
+        keys = self.graph_tab.selected_keys()
+        if keys and (self.active_kind == vs.TAB_GRAPH or self.graph_tab.recording):
+            self.worker.set_poll(gm.GRAPH_POLL, keys, self.graph_tab.period_s)
+        else:
+            self.worker.clear_poll(gm.GRAPH_POLL)
+
+    def _on_rec_status(self, text: str) -> None:
+        self.rec_label.setText(text)
+        self.rec_label.setVisible(bool(text))
 
     def _tab_poll_keys(self, group: str) -> List[str]:
         """グループの項目に、要点パネルが他のグループから使う項目（hold_active など）を足した key。"""
@@ -353,8 +383,9 @@ class MainWindow(QMainWindow):
         """項目をウォッチに追加する（汎用項目表の右クリック・名前表ブラウザから）。"""
         self.watch_dock.add(key)
 
-    def _on_watch_changed(self, _keys: list) -> None:
+    def _on_watch_changed(self, keys: list) -> None:
         self._apply_watch_poll()
+        self.graph_tab.set_watch_keys(keys)
         self._save_watch()
         self._dirty = True
 
@@ -424,6 +455,7 @@ class MainWindow(QMainWindow):
             self.settings_tab.set_items([i for i in self._items if i.group == "settings"])
             self.sym_browser.set_symtab(msg.symtab, self._items)
             self.watch_dock.set_items(self._items)
+            self.graph_tab.set_items(self._items)
             self._set_kind(vs.CONN_CONNECTED)
             self.conn_bar.set_info(vs.device_info_text(msg))
             self._apply_tab_poll()
@@ -443,6 +475,7 @@ class MainWindow(QMainWindow):
         self.ops_tab.setEnabled(connected)
         self.settings_tab.set_connected(connected)
         self.sym_browser.set_connected(connected)
+        self.graph_tab.set_connected(connected)
         self._dirty = True
 
     @property
@@ -481,6 +514,8 @@ class MainWindow(QMainWindow):
         if not self._closed:
             self._closed = True
             self._timer.stop()
+            self.pump()                      # 届いている分を取り込んでから記録を閉じる
+            self.graph_tab.stop_recording()
             self._save_settings()
             self.worker.stop(join_timeout=3)
         super().closeEvent(event)

@@ -41,6 +41,7 @@ class Model:
         self._csv_writer: Any = None
         self._csv_keys: List[str] = []
         self._csv_t0: Optional[float] = None
+        self._csv_rows = 0
         self.reset(items)
 
     # ---- 状態 ----
@@ -134,6 +135,11 @@ class Model:
     def csv_active(self) -> bool:
         return self._csv_writer is not None
 
+    @property
+    def csv_rows(self) -> int:
+        """今の記録で書いたデータ行数（ヘッダを除く）。"""
+        return self._csv_rows
+
     def start_csv(self, path: str, keys: Sequence[str]) -> None:
         """記録を始める。UTF-8 BOM 付き（Excel 用）。ヘッダは表示名と単位。Values を取り込むたびに 1 行書く。"""
         self.stop_csv()
@@ -146,6 +152,7 @@ class Model:
             head.append(f"{it.label}[{it.unit}]" if it.unit else it.label)
         w.writerow(head)
         self._csv_file, self._csv_writer, self._csv_keys, self._csv_t0 = f, w, keys, None
+        self._csv_rows = 0
 
     def stop_csv(self) -> None:
         if self._csv_file is not None:
@@ -172,4 +179,5 @@ class Model:
                 v = round(v, d) if d >= 0 else f"{v:.7g}"
             row.append(v)
         self._csv_writer.writerow(row)
+        self._csv_rows += 1
         self._csv_file.flush()   # type: ignore[union-attr]

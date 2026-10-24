@@ -1,7 +1,7 @@
 """ウォッチ。任意の項目（名前表・レジスタ）を集めて常時表示するドック。
 
 ポーリング組 "watch" の登録は MainWindow が行う（keys が変わると changed、周期が変わると period_changed を出す）。
-G5 のグラフは keys() / changed を系列の候補に使える。
+グラフ（graph_tab）は keys() / changed を系列の候補に使う。
 """
 
 from __future__ import annotations
@@ -66,14 +66,15 @@ class WatchDock(QDockWidget):
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.Interactive)
         hh.setStretchLastSection(False)
-        hh.setSectionResizeMode(COL_VALUE, QHeaderView.Stretch)
+        hh.setSectionResizeMode(COL_LABEL, QHeaderView.Stretch)     # 余りは表示名へ。値は内容に合わせて広げる
+        hh.setMinimumSectionSize(self.fontMetrics().horizontalAdvance("0" * 4))
         lay.addWidget(self.table, 1)
         self.setWidget(body)
         self.setMinimumWidth(self.fontMetrics().horizontalAdvance("0" * 54))
         self._fill_combo()
         self._rebuild()
 
-    # ---- 公開 API（G5 のグラフから使う） ----
+    # ---- 公開 API（グラフから使う） ----
 
     def keys(self) -> List[str]:
         """ウォッチ中の項目の key（追加順）。"""
@@ -139,13 +140,22 @@ class WatchDock(QDockWidget):
             b = QPushButton("削除")
             b.clicked.connect(lambda _c=False, k=it.key: self.remove(k))
             self.table.setCellWidget(r, COL_DELETE, b)
-        self.table.resizeColumnToContents(COL_LABEL)
+        self.table.setColumnWidth(COL_VALUE, max(self.table.columnWidth(COL_VALUE), self._value_min_width()))
         self.table.resizeColumnToContents(COL_UNIT)
         self.table.resizeColumnToContents(COL_RATE)
         self.table.resizeColumnToContents(COL_DELETE)
         self.table.setColumnWidth(COL_RATE, max(self.table.columnWidth(COL_RATE),
                                                 self.fontMetrics().horizontalAdvance("+00000/s") + 12))
         self.table.setUpdatesEnabled(True)
+
+    def _value_min_width(self) -> int:
+        return self.fontMetrics().horizontalAdvance("0" * 14) + 16
+
+    def _fit_value_column(self, text: str) -> None:
+        """値の文字列が切れないよう、値列を（広げる方向にだけ）合わせる。"""
+        need = self.fontMetrics().horizontalAdvance(text) + 16
+        if need > self.table.columnWidth(COL_VALUE):
+            self.table.setColumnWidth(COL_VALUE, need)
 
     def refresh(self, model: Model) -> None:
         """値セルと毎秒だけ更新する。変わったセルだけ setText する。"""
@@ -156,6 +166,7 @@ class WatchDock(QDockWidget):
             cur = self._cells[r]
             if text != cur[0]:
                 cur[0] = text
+                self._fit_value_column(text)
                 self.table.item(r, COL_VALUE).setText(text)
             if rate != cur[1]:
                 cur[1] = rate

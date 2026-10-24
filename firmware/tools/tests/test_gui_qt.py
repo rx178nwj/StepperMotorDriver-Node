@@ -661,6 +661,191 @@ class WindowTest(unittest.TestCase):
         self.wait_for(lambda: f"書き込み RUN_CURRENT = {b + 100} mA: OK" in self.log_text())
         self.assertNotIn("reg.RUN_CURRENT", self.log_text())
 
+    # ---- G5: グラフと CSV 記録 ----
+
+    def open_graph(self):
+        self.connect_up()
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_GRAPH))
+        return self.win.graph_tab
+
+    def set_save_path(self, path):
+        asked = []
+
+        def dialog(title, name, filt):
+            asked.append((title, name, filt))
+            return path
+        self.win.graph_tab._save_dialog = dialog
+        return asked
+
+    def test_graph_motion_preset_and_poll(self) -> None:
+        g = self.open_graph()
+        polls = self.win.worker._polls
+        self.assertNotIn("graph", polls)                                   # 系列が無ければ組は無い
+        g.preset_combo.activated.emit(1)                                   # 「運動」
+        self.assertEqual(g.selected_keys(), ["reg.POSITION", "reg.SPEED", "sym.cur_speed", "sym.plan_speed",
+                                             "sym.target_pos"])
+        keys, period = polls["graph"]
+        self.assertEqual(keys, frozenset(g.selected_keys()))
+        self.assertEqual(period, 0.05)
+        self.assertEqual([s.unit for s in g.plot_specs], ["step", "step/s"])
+        g.period_spin.setValue(100)
+        self.assertEqual(polls["graph"][1], 0.1)
+        g.period_spin.setValue(50)
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.state_text() == "ENABLED")
+        self.wait_for(lambda: g.curve_points("reg.POSITION") > 5)
+        n0 = g.curve_points("sym.cur_speed")
+        self.win.worker.send(wk.WriteReg("MOVE_REL", 3200))
+        self.wait_for(lambda: self.win.model.value("reg.POSITION") == 3200, timeout=8.0)
+        self.wait_for(lambda: g.curve_points("sym.cur_speed") > n0 + 5)
+        xs, ys = g._cache["sym.cur_speed"]
+        self.assertGreater(max(ys), 100.0)                                 # 速度が立ち上がった
+        self.assertLessEqual(max(xs), 0.0)
+        # 一時停止中は描画が止まる。再開で動く
+        g.pause_button.click()
+        self.assertTrue(g.paused)
+        cnt = g.render_count
+        for _ in range(10):
+            self.app.processEvents()
+            time.sleep(0.02)
+        self.assertEqual(g.render_count, cnt)
+        self.assertIn("graph", polls)                                      # 取得は続く
+        g.pause_button.click()
+        self.wait_for(lambda: g.render_count > cnt)
+        # クリアは表示だけ消し、履歴は消さない
+        hist_n = len(self.win.model.history("reg.POSITION")[0])
+        g.clear()
+        self.assertLess(g.curve_points("reg.POSITION"), 3)
+        self.assertGreaterEqual(len(self.win.model.history("reg.POSITION")[0]), hist_n)
+
+    def test_graph_poll_leaves_with_tab(self) -> None:
+        g = self.open_graph()
+        polls = self.win.worker._polls
+        g.apply_preset("電源・温度")
+        self.assertIn("graph", polls)
+        self.win.tabs.setCurrentIndex(0)
+        self.assertNotIn("graph", polls)
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_GRAPH))
+        self.assertIn("graph", polls)
+        g.set_selected([])
+        self.assertNotIn("graph", polls)
+        g.apply_preset("電源・温度")
+        # 記録中はタブを離れても続ける
+        with tempfile.TemporaryDirectory() as d:
+            self.set_save_path(os.path.join(d, "a.csv"))
+            self.assertTrue(g.start_recording())
+            self.win.tabs.setCurrentIndex(0)
+            self.assertIn("graph", polls)
+            g.stop_recording()
+            self.assertNotIn("graph", polls)
+
+    def test_graph_csv_recording(self) -> None:
+        import csv
+
+        g = self.open_graph()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "rec.csv")
+            asked = self.set_save_path(path)
+            self.assertFalse(g.rec_button.isEnabled())                     # 系列が無い
+            g.apply_preset("電源・温度")
+            self.assertTrue(g.rec_button.isEnabled())
+            g.rec_button.click()
+            self.assertEqual(g.rec_button.text(), "記録停止")
+            self.assertRegex(asked[0][1], r"^nemagui_\d{8}_\d{6}\.csv$")
+            self.assertTrue(g.recording)
+            self.assertTrue(self.win.model.csv_active)
+            self.assertFalse(self.win.rec_label.isHidden())
+            self.assertIn("記録中", self.win.rec_label.text())
+            self.assertFalse(g.select_box.isEnabled())                     # 記録中は系列を変えられない
+            self.assertFalse(g.set_selected(["reg.POSITION"]))
+            self.assertEqual(g.selected_keys(), ["reg.VM_MV", "reg.BOARD_TEMP", "reg.MCU_TEMP"])
+            self.wait_for(lambda: self.win.model.csv_rows >= 5)
+            self.wait_for(lambda: "行" in g.rec_label.text() and "rec.csv" in g.rec_label.text())
+            g.rec_button.click()
+            self.assertFalse(g.recording)
+            self.assertFalse(self.win.model.csv_active)
+            self.assertTrue(self.win.rec_label.isHidden())
+            self.assertEqual(g.rec_button.text(), "記録開始")
+            with open(path, encoding="utf-8-sig", newline="") as f:
+                rows = list(csv.reader(f))
+            self.assertEqual(rows[0][:2], ["時刻", "経過[s]"])
+            self.assertEqual(len(rows[0]), 5)
+            self.assertGreaterEqual(len(rows) - 1, 5)
+            self.assertEqual(len(rows) - 1, self.win.model.csv_rows)
+            self.assertTrue(any(r[2] for r in rows[1:]))                   # VM_MV の値が入る
+
+    def test_graph_csv_cancel_and_closed_on_disconnect(self) -> None:
+        g = self.open_graph()
+        with tempfile.TemporaryDirectory() as d:
+            g.apply_preset("電源・温度")
+            self.set_save_path(None)                                       # ダイアログを取り消し
+            self.assertFalse(g.start_recording())
+            self.assertFalse(g.recording)
+            path = os.path.join(d, "x.csv")
+            self.set_save_path(path)
+            self.assertTrue(g.start_recording())
+            self.wait_for(lambda: self.win.model.csv_rows >= 2)
+            self.win.conn_bar.connect_button.click()                       # 切断
+            self.wait_for(lambda: self.win.conn_kind == vs.CONN_DISCONNECTED)
+            self.assertFalse(g.recording)
+            self.assertFalse(self.win.model.csv_active)
+            self.win.tabs.setCurrentIndex(0)                               # 表示も記録も無ければ組は外れる
+            self.assertNotIn("graph", self.win.worker._polls)
+            self.assertTrue(self.win.rec_label.isHidden())
+            with open(path, encoding="utf-8-sig") as f:                    # 閉じているので読める
+                self.assertGreaterEqual(len(f.read().splitlines()), 3)
+
+    def test_graph_closed_on_window_close(self) -> None:
+        g = self.open_graph()
+        with tempfile.TemporaryDirectory() as d:
+            g.apply_preset("電源・温度")
+            self.set_save_path(os.path.join(d, "y.csv"))
+            self.assertTrue(g.start_recording())
+            self.wait_for(lambda: self.win.model.csv_rows >= 2)
+            self.win.close()
+            self.assertFalse(self.win.model.csv_active)
+
+    def test_graph_state_plot_cursor_and_png(self) -> None:
+        g = self.open_graph()
+        g.apply_preset("原点復帰")
+        self.assertEqual([s.unit for s in g.plot_specs], ["step", ""])
+        self.assertEqual(len(g.plot_specs[1].keys), 4)
+        self.wait_for(lambda: g.curve_points("sym.home.state") >= 2)
+        self.assertEqual(g.curve_points("sym.home.state") % 2, 0)          # 階段状（点が 2 倍近く）
+        g.set_cursor(-1.0)
+        self.assertIn("t = -1.00 s", g.readout_text())
+        self.assertIn("位置", g.readout_text())
+        g.set_cursor(None)
+        self.assertEqual(g.readout_text(), "")
+        g.filter_edit.setText("reg.vm_mv")
+        shown = [i for i in range(g.list.count()) if not g.list.item(i).isHidden()]
+        self.assertEqual([g.list.item(i).data(Qt.UserRole) for i in shown], ["reg.VM_MV"])
+        with tempfile.TemporaryDirectory() as d:
+            png = os.path.join(d, "g.png")
+            self.set_save_path(png)
+            self.assertTrue(g.save_png())
+            self.assertGreater(os.path.getsize(png), 1000)
+
+    def test_graph_candidates_watch_first(self) -> None:
+        g = self.open_graph()
+        self.win.add_to_watch("reg.VM_MV")
+        self.assertTrue(g.list.item(0).data(Qt.UserRole) == "reg.VM_MV")
+        self.assertTrue(g.list.item(0).text().startswith("★"))
+        g.list.item(0).setCheckState(Qt.Checked)
+        self.assertEqual(g.selected_keys(), ["reg.VM_MV"])
+
+    def test_watch_value_column_wide_enough(self) -> None:
+        self.connect_up()
+        w = self.win.watch_dock
+        for k in ("sym.position", "reg.VM_MV", "reg.FAULT", "reg.STATE", "sym.uwTick"):
+            self.win.add_to_watch(k)
+        self.wait_for(lambda: all(w.table.item(r, 1).text() not in ("—", "") for r in range(w.table.rowCount())))
+        fm = w.table.fontMetrics()
+        for r in range(w.table.rowCount()):
+            text = w.table.item(r, 1).text()
+            self.assertGreaterEqual(w.table.columnWidth(1), fm.horizontalAdvance(text) + 8, text)
+        self.assertGreaterEqual(w.table.columnWidth(1), fm.horizontalAdvance("0" * 10))
+
 
 if __name__ == "__main__":
     unittest.main()
