@@ -125,25 +125,35 @@ POLL_PERIODS: Dict[str, float] = {
 OVERVIEW_POLL = "overview"
 OVERVIEW_PERIOD_S = 0.05
 TAB_POLL = "tab"
+OPS_POLL = "ops"            # 操作タブ表示中だけ。概要に無い J10_MODE を読む
+OPS_PERIOD_S = 0.1
+OPS_POLL_KEYS = ["reg.J10_MODE"]
+SETTINGS_POLL = "settings"  # 設定タブ表示中だけ。設定値と CONFIG_STATUS を読む
+SETTINGS_PERIOD_S = 1.0
+
+
+TAB_OPS = "ops"
+TAB_SETTINGS = "settings"
+TAB_GRAPH = "graph"
 
 
 @dataclass(frozen=True)
 class TabSpec:
     label: str
-    group: Optional[str]      # 項目表のグループ。None ならプレースホルダ
+    group: Optional[str]      # 項目表のグループ。None なら専用の画面かプレースホルダ
     note: str = ""            # プレースホルダの説明
+    kind: str = ""            # 専用の画面の種類（TAB_OPS / TAB_SETTINGS）またはプレースホルダ（TAB_GRAPH）
 
 
 def tab_specs() -> List[TabSpec]:
     """表示順: 操作・設定・各内部グループ・グラフ。"""
     labels = {"motion": "モーション", "state": "状態遷移", "monitor": "監視", "sensor": "センサ",
               "j10": "J10・原点", "comm": "通信統計", "diag": "診断", "other": "その他"}
-    out = [TabSpec("操作", None, "操作タブは G3 で実装予定です"),
-           TabSpec("設定", None, "設定タブは G3 で実装予定です")]
+    out = [TabSpec("操作", None, kind=TAB_OPS), TabSpec("設定", None, kind=TAB_SETTINGS)]
     for g in itemsmod.GROUPS:
         if g in labels:
             out.append(TabSpec(labels[g], g))
-    out.append(TabSpec("グラフ", None, "グラフは G5 で実装予定です"))
+    out.append(TabSpec("グラフ", None, "グラフは G5 で実装予定です", TAB_GRAPH))
     return out
 
 
@@ -238,3 +248,172 @@ def format_stats(s: wk.Stats) -> str:
     ovt = f"{ov * 1000:.0f} ms" if ov else "—"
     return (f"要求 {s.requests}   タイムアウト {s.timeouts}   再送 {s.retransmits}   エラー {s.errors}   "
             f"往復 平均 {s.rtt_avg_ms:.1f} / 最大 {s.rtt_max_ms:.1f} ms   概要の周期 {ovt}")
+
+
+# ---------------------------------------------------------------- 操作の受付条件
+
+# 操作の名前（OpsContext から op_availability で可否を引く）
+OP_ENABLE = "ENABLE"
+OP_DISABLE = "DISABLE"
+OP_CLEAR_FAULT = "CLEAR_FAULT"
+OP_MOVE_ABS = "MOVE_ABS"
+OP_MOVE_REL = "MOVE_REL"
+OP_RUN_SPEED = "RUN_SPEED"              # 速度 != 0
+OP_RUN_SPEED_ZERO = "RUN_SPEED_ZERO"    # 速度 0（減速停止）
+OP_SET_POSITION = "SET_POSITION"
+OP_SYNC_POSITION = "SYNC_POSITION"
+OP_RESET_ELEC_ANGLE = "RESET_ELEC_ANGLE"
+OP_HOME_NEG = "HOME_NEG"
+OP_HOME_POS = "HOME_POS"
+ALL_OPS = (OP_ENABLE, OP_DISABLE, OP_CLEAR_FAULT, OP_MOVE_ABS, OP_MOVE_REL, OP_RUN_SPEED, OP_RUN_SPEED_ZERO,
+           OP_SET_POSITION, OP_SYNC_POSITION, OP_RESET_ELEC_ANGLE, OP_HOME_NEG, OP_HOME_POS)
+
+STATUS_MOVING = 1 << 0
+STATUS_TARGET_REACHED = 1 << 7
+INPUT_HOMING = 1 << 2
+INPUT_HOMED = 1 << 3
+INPUT_HOME_FAILED = 1 << 4
+INPUT_LIMIT_STOP = 1 << 5
+STATE_DISABLED, STATE_ENABLED, STATE_FAULT = 1, 2, 3
+J10_MODE_HOME = 2
+
+
+@dataclass(frozen=True)
+class OpsContext:
+    """操作の可否を決める現在値。取得できていない値は None。"""
+
+    connected: bool
+    state: Optional[int] = None
+    status: Optional[int] = None
+    input_status: Optional[int] = None
+    j10_mode: Optional[int] = None
+
+    @property
+    def moving(self) -> Optional[bool]:
+        return None if self.status is None else bool(self.status & STATUS_MOVING)
+
+    @property
+    def homing(self) -> Optional[bool]:
+        return None if self.input_status is None else bool(self.input_status & INPUT_HOMING)
+
+
+@dataclass(frozen=True)
+class OpState:
+    enabled: bool
+    reason: str = ""          # 無効のときの理由（ツールチップ用）
+
+
+def ops_context(model: Any, connected: bool) -> OpsContext:
+    """Model（value(key) を持つもの）から OpsContext を作る。"""
+    def val(key: str) -> Optional[int]:
+        v = model.value(key)
+        return None if v is None else int(v)
+
+    return OpsContext(connected, val("reg.STATE"), val("reg.STATUS"), val("reg.INPUT_STATUS"), val("reg.J10_MODE"))
+
+
+def _need_enabled(ctx: OpsContext) -> str:
+    if ctx.state is None:
+        return "状態（STATE）を取得できていません"
+    if ctx.state != STATE_ENABLED:
+        return f"ENABLED のときだけ実行できます（現在 {state_name(ctx.state)}）"
+    return ""
+
+
+def _need_stopped(ctx: OpsContext) -> str:
+    if ctx.moving is None:
+        return "ステータス（STATUS）を取得できていません"
+    if ctx.moving:
+        return "動作中は実行できません（停止してから）"
+    return ""
+
+
+def _need_not_homing(ctx: OpsContext) -> str:
+    if ctx.homing is None:
+        return "入力状態（INPUT_STATUS）を取得できていません"
+    if ctx.homing:
+        return "原点復帰中は実行できません"
+    return ""
+
+
+def op_availability(ctx: OpsContext) -> Dict[str, OpState]:
+    """操作ごとの可否と、無効のときの理由。usb_interface.md 8.5 の受付条件に基づく。
+
+    あくまで GUI 側の目安であり、最終判断は基板が行う（合わなければ REJECTED が返りログに出る）。
+    移動方向のリミット作動による拒否は基板に任せ、ここでは無効にしない。
+    """
+    if not ctx.connected:
+        return {op: OpState(False, "未接続です") for op in ALL_OPS}
+
+    def first(*reasons: str) -> OpState:
+        for r in reasons:
+            if r:
+                return OpState(False, r)
+        return OpState(True)
+
+    def only_state(want: int, label: str) -> OpState:
+        if ctx.state is None:
+            return OpState(False, "状態（STATE）を取得できていません")
+        if ctx.state != want:
+            return OpState(False, f"{label} のときだけ実行できます（現在 {state_name(ctx.state)}）")
+        return OpState(True)
+
+    motion = first(_need_enabled(ctx), _need_not_homing(ctx))
+    standing = first(_need_stopped(ctx), _need_not_homing(ctx))
+    home_reasons = [_need_enabled(ctx), _need_stopped(ctx)]
+    if ctx.j10_mode is None:
+        home_reasons.append("J10_MODE を取得できていません")
+    elif ctx.j10_mode != J10_MODE_HOME:
+        home_reasons.append(f"J10_MODE が HOME（2）のときだけ実行できます（現在 {ctx.j10_mode}）")
+    home = first(*home_reasons)
+    return {
+        OP_ENABLE: only_state(STATE_DISABLED, "DISABLED"),
+        OP_DISABLE: only_state(STATE_ENABLED, "ENABLED"),
+        OP_CLEAR_FAULT: only_state(STATE_FAULT, "FAULT"),
+        OP_MOVE_ABS: motion,
+        OP_MOVE_REL: motion,
+        OP_RUN_SPEED: motion,
+        OP_RUN_SPEED_ZERO: first(_need_enabled(ctx)),
+        OP_SET_POSITION: standing,
+        OP_SYNC_POSITION: standing,
+        OP_RESET_ELEC_ANGLE: first(_need_enabled(ctx), _need_stopped(ctx), _need_not_homing(ctx)),
+        OP_HOME_NEG: home,
+        OP_HOME_POS: home,
+    }
+
+
+def settings_cmd_availability(connected: bool, status: Optional[int]) -> OpState:
+    """SAVE / LOAD / FACTORY_SETTINGS の可否（停止中のみ）。GUI 側の目安。"""
+    if not connected:
+        return OpState(False, "未接続です")
+    if status is None:
+        return OpState(False, "ステータス（STATUS）を取得できていません")
+    if status & STATUS_MOVING:
+        return OpState(False, "動作中は実行できません（停止中のみ）")
+    return OpState(True)
+
+
+# ---------------------------------------------------------------- 設定タブの表示
+
+def range_text(item: Item) -> str:
+    """設定の範囲の表示。離散値なら列挙、ビットなら 0〜最大、それ以外は 最小〜最大。"""
+    if item.choices:
+        return " / ".join(str(c) for c in item.choices)
+    if item.enum:
+        return " / ".join(f"{k}={v}" for k, v in item.enum.items())
+    if item.min is None or item.max is None:
+        return ""
+    if item.bits:
+        return f"0x{int(item.min):02X}〜0x{int(item.max):02X}"
+    return f"{int(item.min)}〜{int(item.max)}"
+
+
+def write_result_text(r: wk.WriteResult) -> str:
+    """設定の行ごとに出す書き込み結果。"""
+    if r.unknown:
+        return f"不明（{r.error}）"
+    if r.error:
+        return f"失敗（{r.error}）"
+    if r.result == 0:
+        return "OK"
+    return r.result_name or "不明"

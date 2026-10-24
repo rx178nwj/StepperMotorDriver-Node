@@ -117,6 +117,106 @@ class LogTest(unittest.TestCase):
         self.assertEqual(len(vs.stamp(0.0)), 12)
 
 
+class OpsTest(unittest.TestCase):
+    """操作の受付条件（GUI 側の目安。最終判断は基板）。"""
+
+    @staticmethod
+    def av(state=2, moving=False, homing=False, j10=2, connected=True):
+        status = 1 if moving else 0
+        inp = vs.INPUT_HOMING if homing else 0
+        return vs.op_availability(vs.OpsContext(connected, state, status, inp, j10))
+
+    @staticmethod
+    def enabled(av):
+        return {k for k, v in av.items() if v.enabled}
+
+    def test_disconnected_all_disabled(self) -> None:
+        av = self.av(connected=False)
+        self.assertEqual(self.enabled(av), set())
+        self.assertTrue(all("未接続" in v.reason for v in av.values()))
+        self.assertEqual(set(av), set(vs.ALL_OPS))
+
+    def test_unknown_values_disabled_with_reason(self) -> None:
+        av = vs.op_availability(vs.OpsContext(True))
+        self.assertEqual(self.enabled(av), set())
+        self.assertTrue(all(v.reason for v in av.values()))
+
+    def test_state_commands(self) -> None:
+        cmds = {"ENABLE", "DISABLE", "CLEAR_FAULT"}
+        self.assertEqual(self.enabled(self.av(state=1)) & cmds, {"ENABLE"})
+        self.assertEqual(self.enabled(self.av(state=2)) & cmds, {"DISABLE"})
+        self.assertEqual(self.enabled(self.av(state=3)) & cmds, {"CLEAR_FAULT"})
+        self.assertEqual(self.enabled(self.av(state=0)) & cmds, set())
+        self.assertIn("DISABLED", self.av(state=2)["ENABLE"].reason)
+
+    def test_motion_needs_enabled_and_not_homing(self) -> None:
+        motion = {"MOVE_ABS", "MOVE_REL", "RUN_SPEED"}
+        self.assertEqual(self.enabled(self.av(state=2, moving=True)) & motion, motion)   # 動作中でも指令は可
+        self.assertEqual(self.enabled(self.av(state=1)) & motion, set())
+        self.assertIn("ENABLED", self.av(state=1)["MOVE_ABS"].reason)
+        av = self.av(state=2, homing=True)
+        self.assertEqual(self.enabled(av) & motion, set())
+        self.assertIn("原点復帰中", av["MOVE_REL"].reason)
+        self.assertTrue(av["RUN_SPEED_ZERO"].enabled)       # 速度 0 は原点復帰中でも可
+        self.assertFalse(self.av(state=1)["RUN_SPEED_ZERO"].enabled)
+
+    def test_position_ops_need_stopped(self) -> None:
+        ops = {"SET_POSITION", "SYNC_POSITION", "RESET_ELEC_ANGLE"}
+        self.assertEqual(self.enabled(self.av(state=2)) & ops, ops)
+        self.assertEqual(self.enabled(self.av(state=2, moving=True)) & ops, set())
+        self.assertIn("動作中", self.av(state=2, moving=True)["SET_POSITION"].reason)
+        self.assertEqual(self.enabled(self.av(state=2, homing=True)) & ops, set())
+        # SET/SYNC は状態を問わない。RESET_ELEC_ANGLE は ENABLED が必要
+        self.assertEqual(self.enabled(self.av(state=1)) & ops, {"SET_POSITION", "SYNC_POSITION"})
+
+    def test_home_needs_enabled_stopped_j10(self) -> None:
+        home = {"HOME_NEG", "HOME_POS"}
+        self.assertEqual(self.enabled(self.av()) & home, home)
+        self.assertEqual(self.enabled(self.av(state=1)) & home, set())
+        self.assertEqual(self.enabled(self.av(moving=True)) & home, set())
+        av = self.av(j10=1)
+        self.assertEqual(self.enabled(av) & home, set())
+        self.assertIn("J10_MODE", av["HOME_NEG"].reason)
+        self.assertEqual(self.enabled(self.av(j10=None)) & home, set())
+
+    def test_settings_cmd(self) -> None:
+        self.assertTrue(vs.settings_cmd_availability(True, 0).enabled)
+        self.assertTrue(vs.settings_cmd_availability(True, 0x80).enabled)
+        self.assertFalse(vs.settings_cmd_availability(True, 1).enabled)
+        self.assertIn("動作中", vs.settings_cmd_availability(True, 1).reason)
+        self.assertFalse(vs.settings_cmd_availability(False, 0).enabled)
+        self.assertFalse(vs.settings_cmd_availability(True, None).enabled)
+
+    def test_ops_context_from_model(self) -> None:
+        class M:
+            def value(self, key):
+                return {"reg.STATE": 2, "reg.STATUS": 1}.get(key)
+
+        ctx = vs.ops_context(M(), True)
+        self.assertEqual((ctx.state, ctx.moving, ctx.homing, ctx.j10_mode), (2, True, None, None))
+
+
+class SettingsViewTest(unittest.TestCase):
+    def test_range_text(self) -> None:
+        self.assertEqual(vs.range_text(ITEMS["reg.RUN_CURRENT"]), "250〜3000")
+        self.assertEqual(vs.range_text(ITEMS["reg.MICROSTEP"]), "1 / 2 / 4 / 8 / 16 / 32")
+        self.assertIn("2=HOME", vs.range_text(ITEMS["reg.J10_MODE"]))
+        self.assertEqual(vs.range_text(ITEMS["reg.FLAGS"]), "0x00〜0x1F")
+
+    def test_write_result_text(self) -> None:
+        w = wk.WriteReg("reg.RUN_CURRENT", 1)
+        self.assertEqual(vs.write_result_text(wk.WriteResult(w, 0, "OK")), "OK")
+        self.assertEqual(vs.write_result_text(wk.WriteResult(w, 1, "REJECTED")), "REJECTED")
+        self.assertEqual(vs.write_result_text(wk.WriteResult(w, 2, "INVALID")), "INVALID")
+        self.assertIn("不明", vs.write_result_text(wk.WriteResult(w, None, "不明", "無応答", True)))
+        self.assertIn("失敗", vs.write_result_text(wk.WriteResult(w, None, "", "範囲外")))
+
+    def test_tab_kinds(self) -> None:
+        kinds = [t.kind for t in vs.tab_specs()]
+        self.assertEqual(kinds[:2], [vs.TAB_OPS, vs.TAB_SETTINGS])
+        self.assertEqual(kinds[-1], vs.TAB_GRAPH)
+
+
 class StatsTest(unittest.TestCase):
     def test_format(self) -> None:
         s = wk.Stats(0.0, True, 120, 2, 3, 1, 1.25, 4.5, {"overview": 0.052})

@@ -11,7 +11,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     from PySide6.QtCore import QSettings, Qt
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QTextFormat
+    from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QSpinBox
     HAVE_QT = True
 except ImportError:
     HAVE_QT = False
@@ -159,6 +160,254 @@ class WindowTest(unittest.TestCase):
         s = QSettings(self.settings_path, QSettings.IniFormat)
         self.assertEqual(int(s.value("tab")), 3)
         self.assertIsNotNone(s.value("geometry"))
+
+    # ---- G3: 操作タブ・設定タブ・ログ ----
+
+    def tab_index(self, kind: str) -> int:
+        return [s.kind for s in self.win._specs].index(kind)
+
+    def log_text(self) -> str:
+        return self.win.log.toPlainText()
+
+    def test_ops_enable_and_move(self) -> None:
+        self.connect_up()
+        ops = self.win.ops_tab
+        self.assertEqual(self.win.active_kind, vs.TAB_OPS)
+        self.wait_for(lambda: ops.buttons[vs.OP_ENABLE].isEnabled())
+        # DISABLED 中は移動系が無効で、理由がツールチップに出る
+        for op in (vs.OP_MOVE_ABS, vs.OP_MOVE_REL, vs.OP_RUN_SPEED, vs.OP_DISABLE, vs.OP_HOME_NEG):
+            self.assertFalse(ops.buttons[op].isEnabled(), op)
+        self.assertIn("ENABLED", ops.buttons[vs.OP_MOVE_REL].toolTip())
+        self.assertFalse(ops.quick_buttons[0].isEnabled())
+        self.assertEqual(ops.state_label.text(), "DISABLED")
+
+        ops.buttons[vs.OP_ENABLE].click()
+        self.wait_for(lambda: "COMMAND ENABLE: OK" in self.log_text())
+        self.wait_for(lambda: ops.buttons[vs.OP_MOVE_REL].isEnabled())
+        self.assertFalse(ops.buttons[vs.OP_ENABLE].isEnabled())
+        self.assertTrue(ops.buttons[vs.OP_DISABLE].isEnabled())
+        self.assertFalse(ops.buttons[vs.OP_HOME_NEG].isEnabled())     # J10_MODE != HOME
+        self.assertEqual(ops.state_label.text(), "ENABLED")
+        pos0 = self.win.model.value("reg.POSITION")
+        ops.quick_buttons[2].click()                                  # +200
+        self.wait_for(lambda: self.win.model.value("reg.POSITION") != pos0)
+        self.wait_for(lambda: ops.pos_label.text() == f"{self.win.model.value('reg.POSITION')} step"
+                      and self.win.model.value("reg.POSITION") == pos0 + 200)
+        self.assertIn("書き込み MOVE_REL = 200: OK", self.log_text())
+        # 絶対移動と速度 0
+        ops.target_spin.setValue(0)
+        ops.buttons[vs.OP_MOVE_ABS].click()
+        self.wait_for(lambda: self.win.model.value("reg.POSITION") == 0)
+        ops.buttons[vs.OP_RUN_SPEED_ZERO].click()
+        self.wait_for(lambda: "書き込み RUN_SPEED = 0: OK" in self.log_text())
+
+    def test_ops_disabled_when_disconnected(self) -> None:
+        self.connect_up()
+        ops = self.win.ops_tab
+        self.wait_for(lambda: ops.buttons[vs.OP_ENABLE].isEnabled())
+        self.sim.unplug()
+        self.wait_for(lambda: self.win.conn_kind == vs.CONN_WAITING)
+        self.wait_for(lambda: not ops.buttons[vs.OP_ENABLE].isEnabled())
+        self.assertTrue(all(not b.isEnabled() for b in ops.buttons.values()))
+        self.assertIn("未接続", ops.buttons[vs.OP_ENABLE].toolTip())
+
+    def test_ops_set_position_rejected_while_moving_is_disabled(self) -> None:
+        self.connect_up()
+        ops = self.win.ops_tab
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: ops.buttons[vs.OP_SET_POSITION].isEnabled())
+        ops.speed_spin.setValue(1000)
+        self.wait_for(lambda: ops.buttons[vs.OP_RUN_SPEED].isEnabled())
+        ops.buttons[vs.OP_RUN_SPEED].click()
+        self.wait_for(lambda: not ops.buttons[vs.OP_SET_POSITION].isEnabled())
+        self.assertIn("動作中", ops.buttons[vs.OP_SET_POSITION].toolTip())
+        ops.buttons[vs.OP_RUN_SPEED_ZERO].click()
+        self.wait_for(lambda: ops.buttons[vs.OP_SET_POSITION].isEnabled(), timeout=6.0)
+
+    def test_tab_polls_ops_and_settings(self) -> None:
+        self.connect_up()
+        polls = self.win.worker._polls
+        self.assertEqual(self.win.tabs.currentIndex(), 0)
+        keys, period = polls["ops"]
+        self.assertIn("reg.J10_MODE", keys)
+        self.assertEqual(period, 0.1)
+        self.assertNotIn("settings", polls)
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_SETTINGS))
+        keys, period = polls["settings"]
+        self.assertIn("reg.RUN_CURRENT", keys)
+        self.assertIn("reg.CONFIG_STATUS", keys)
+        self.assertEqual(period, 1.0)
+        self.assertNotIn("ops", polls)
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_OPS) + 2)     # モーション
+        self.assertNotIn("ops", polls)
+        self.assertNotIn("settings", polls)
+        self.assertIn("tab", polls)
+        self.assertIn("overview", polls)
+
+    def open_settings(self):
+        self.connect_up()
+        self.win.tabs.setCurrentIndex(self.tab_index(vs.TAB_SETTINGS))
+        st = self.win.settings_tab
+        self.wait_for(lambda: st.table.item(st._rows["reg.RUN_CURRENT"], 1).text() != "—")
+        self.wait_for(lambda: st.lamps._shown[0] is True)       # LOADED
+        return st
+
+    def board_text(self, st, key: str) -> str:
+        return st.table.item(st._rows[key], 1).text()
+
+    def test_settings_edit_write_save(self) -> None:
+        st = self.open_settings()
+        key = "reg.RUN_CURRENT"
+        row = st._rows[key]
+        ed = st.editors[key]
+        b = int(self.board_text(st, key))
+        self.assertEqual(ed.value(), b)
+        self.assertFalse(st.write_button.isEnabled())
+        self.assertFalse(st.edit.changed())
+        self.assertFalse(st.lamps._shown[1])                   # UNSAVED なし
+
+        ed._spin.setValue(b + 100)
+        self.assertTrue(st.edit.is_changed(key))
+        self.assertIn("ffe08a", ed.styleSheet().lower())
+        self.assertEqual(st.table.item(row, 0).background().color().name(), "#ffe08a")
+        self.assertTrue(st.write_button.isEnabled())
+        st.write_button.click()
+        self.wait_for(lambda: st.table.item(row, 6).text() == "OK")
+        self.wait_for(lambda: self.board_text(st, key) == str(b + 100))
+        self.wait_for(lambda: st.lamps._shown[1] is True)      # UNSAVED が点灯
+        self.assertIn("未保存", st.unsaved_label.text())
+        self.assertFalse(st.edit.is_changed(key))
+        self.assertEqual(st.table.item(row, 0).background().color().name(), "#000000")   # 強調が消える
+        self.assertEqual(self.win.model.value(key), b + 100)
+
+        st.save_button.click()
+        self.wait_for(lambda: "COMMAND SAVE_SETTINGS: OK" in self.log_text())
+        self.wait_for(lambda: st.lamps._shown[1] is False)
+        self.assertEqual(st.unsaved_label.text(), "")
+
+    def test_settings_range_and_polling_does_not_overwrite(self) -> None:
+        st = self.open_settings()
+        key = "reg.RUN_CURRENT"
+        ed = st.editors[key]
+        b = int(self.board_text(st, key))
+        ed._spin.setValue(5000)                                # 範囲外は入力できない
+        self.assertEqual(ed.value(), 3000)
+        ed._spin.setValue(10)
+        self.assertEqual(ed.value(), 250)
+        self.assertEqual(vs.range_text(st.edit.items[0]), "250〜3000")
+        ed._spin.setValue(b + 100)
+        self.win.worker.send(wk.WriteReg(key, b + 200))        # 別経路で基板の値が変わる
+        self.wait_for(lambda: self.board_text(st, key) == str(b + 200))
+        self.assertEqual(ed.value(), b + 100)                  # 編集中の値は上書きされない
+        self.assertTrue(st.edit.is_changed(key))
+        st.reload_button.click()                               # 読み直しで編集値が基板の値に戻る
+        self.wait_for(lambda: ed.value() == b + 200)
+        self.assertFalse(st.edit.changed())
+
+    def test_settings_widgets(self) -> None:
+        st = self.open_settings()
+        self.assertIsInstance(st.editors["reg.MICROSTEP"]._combo.itemData(0), int)
+        self.assertEqual([st.editors["reg.MICROSTEP"]._combo.itemData(i) for i in range(6)], [1, 2, 4, 8, 16, 32])
+        self.assertEqual(st.editors["reg.J10_MODE"]._combo.count(), 3)
+        self.assertEqual(st.editors["reg.PA7_MODE"]._combo.count(), 3)
+        flags = st.editors["reg.FLAGS"]
+        self.assertEqual(len(flags._checks), 5)
+        board = int(self.win.model.value("reg.FLAGS"))
+        self.assertEqual(flags.value(), board)
+        flags._checks[0].setChecked(not flags._checks[0].isChecked())
+        self.assertEqual(flags.value(), board ^ 1)
+        self.assertTrue(st.edit.is_changed("reg.FLAGS"))
+        st.reload_button.click()
+        self.wait_for(lambda: flags.value() == board)
+
+    def test_settings_rejected_result_shown(self) -> None:
+        st = self.open_settings()
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.win.model.value("reg.STATE") == 2)
+        flags = st.editors["reg.FLAGS"]
+        flags._checks[3].setChecked(not flags._checks[3].isChecked())      # ENABLED 中の AGC 変更は REJECTED
+        st.write_button.click()
+        row = st._rows["reg.FLAGS"]
+        self.wait_for(lambda: st.table.item(row, 6).text() == "REJECTED")
+        self.assertTrue(st.edit.is_changed("reg.FLAGS"))                   # 書けなかった行は強調のまま
+
+    def test_settings_factory_confirm(self) -> None:
+        st = self.open_settings()
+        sent = []
+        orig = st._send
+        st._send = lambda req: (sent.append(req), orig(req))[1]
+        asked = []
+        st.confirm = lambda title, text: (asked.append(text), False)[1]
+        st.factory_button.click()
+        st.load_button.click()
+        self.assertEqual(len(asked), 2)
+        self.assertIn("失われます", asked[0])
+        self.assertEqual(sent, [])                                         # キャンセルなら何も送らない
+        key = "reg.RUN_CURRENT"
+        b = int(self.board_text(st, key))
+        st.editors[key]._spin.setValue(b + 100)
+        st.confirm = lambda title, text: True
+        st.factory_button.click()
+        self.wait_for(lambda: "COMMAND FACTORY_SETTINGS: OK" in self.log_text())
+        self.assertEqual([r.code for r in sent if isinstance(r, wk.Command)], [wk.Cmd.FACTORY_SETTINGS])
+        self.wait_for(lambda: not st.edit.changed())                      # 実行後に読み直して編集値も戻る
+        self.wait_for(lambda: self.board_text(st, key) == str(st.editors[key].value()))
+        # LOAD_SETTINGS は確認 OK で送られる
+        st.load_button.click()
+        self.wait_for(lambda: "COMMAND LOAD_SETTINGS" in self.log_text())
+
+    def test_settings_commands_disabled_while_moving(self) -> None:
+        st = self.open_settings()
+        self.assertTrue(st.save_button.isEnabled())
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: self.win.model.value("reg.STATE") == 2)
+        self.win.worker.send(wk.WriteReg("RUN_SPEED", 1000))
+        for b in (st.save_button, st.load_button, st.factory_button):
+            self.wait_for(lambda b=b: not b.isEnabled())
+            self.assertIn("動作中", b.toolTip())
+        self.win.send_command(wk.Cmd.STOP)
+        self.wait_for(lambda: st.save_button.isEnabled(), timeout=6.0)
+
+    def test_int_spin_beyond_int32(self) -> None:
+        from nemagui.ui.inputs import int_value, make_int_spin, set_int_value
+
+        small = make_int_spin(0, 3000)
+        self.assertIsInstance(small, QSpinBox)
+        big = make_int_spin(0, 0xFFFFFFFF)
+        self.assertIsInstance(big, QDoubleSpinBox)
+        set_int_value(big, 0xFFFFFFFF)
+        self.assertEqual(int_value(big), 0xFFFFFFFF)
+        big.setValue(1e12)
+        self.assertEqual(int_value(big), 0xFFFFFFFF)
+
+    def test_log_lines_share_one_font(self) -> None:
+        self.connect_up()
+        self.win.send_command(wk.Cmd.ENABLE)
+        self.wait_for(lambda: "COMMAND ENABLE: OK" in self.log_text())
+        self.win.log_info("ASCII only line")
+        self.win.log_warn("日本語を含む警告 <b>&amp;</b>")
+        self.win._append_log(vs.LogEntry("エラー", vs.LEVEL_ERROR))
+        self.assertIn("<b>&amp;</b>", self.log_text())                    # エスケープされず文字のまま出る
+        fonts = set()
+        colors = set()
+        lines = 0
+        block = self.win.log.document().begin()
+        while block.isValid():
+            lines += 1
+            it = block.begin()
+            while not it.atEnd():
+                fmt = it.fragment().charFormat()
+                for prop in (QTextFormat.FontFamily, QTextFormat.FontFamilies, QTextFormat.FontPointSize,
+                             QTextFormat.FontPixelSize, QTextFormat.FontWeight):
+                    self.assertFalse(fmt.hasProperty(prop), (block.text(), prop))
+                fonts.add(fmt.font().toString())
+                colors.add(fmt.foreground().color().name())
+                it += 1
+            block = block.next()
+        self.assertGreaterEqual(lines, 4)
+        self.assertEqual(len(fonts), 1, fonts)
+        self.assertGreaterEqual(len(colors), 3)                           # 色は行ごとに付く
+        self.assertEqual(self.win.log.document().defaultFont().toString(), self.win.log.font().toString())
 
 
 if __name__ == "__main__":

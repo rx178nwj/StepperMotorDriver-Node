@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import html
 import queue
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PySide6.QtGui import (QCloseEvent, QColor, QFont, QFontDatabase, QKeySequence, QShortcut, QTextBlockFormat, QTextCharFormat,
+                           QTextCursor)
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QSplitter,
                                QTabWidget, QVBoxLayout, QWidget)
 
@@ -21,12 +21,32 @@ from ..items import Item
 from ..model import Model
 from .conn_bar import ConnectionBar
 from .items_table import GroupTable
+from .ops_tab import OpsTab
 from .overview import OverviewPanel, overview_keys
+from .settings_tab import CONFIG_STATUS_KEY, SettingsTab
 from .sim_dock import SimDock
 
 LOG_MAX_LINES = 5000
 PUMP_INTERVAL_MS = 20
 PUMP_MAX_MESSAGES = 500
+
+
+LOG_FONT_CANDIDATES = ("Yu Gothic UI", "Meiryo UI", "MS UI Gothic", "Segoe UI")
+
+
+def log_font(base: QFont) -> QFont:
+    """ログ用フォント。英数字と日本語を 1 つの実在するフォントで描かせる。
+
+    app.font() の先頭が実在しない総称名（"Sans Serif"。offscreen など）だと、ASCII だけの行は小さな代替フォント、
+    日本語を含む行は日本語フォント（先頭の記号・数字もこちら）で描かれ、行ごとに大きさが変わって見える。
+    """
+    have = set(QFontDatabase.families())
+    f = QFont(base)
+    for fam in LOG_FONT_CANDIDATES:
+        if fam in have:
+            f.setFamilies([fam])
+            break
+    return f
 
 
 @dataclass
@@ -37,6 +57,7 @@ class AppConfig:
     reconnect_interval_s: float = 1.0
     stats_period_s: float = 1.0
     find_ports: Callable[[], List[str]] = find_ports
+    confirm: Optional[Callable[[str, str], bool]] = None   # 設定タブの確認ダイアログ（試験で差し替える）
 
 
 class MainWindow(QMainWindow):
@@ -147,12 +168,20 @@ class MainWindow(QMainWindow):
         lv.addWidget(self.overview, 1)
 
         # 中央: タブ
+        self.ops_tab = OpsTab(self.worker.send)
+        self.ops_tab.setEnabled(False)
+        self.settings_tab = SettingsTab(self.worker.send, [i for i in self._items if i.group == "settings"],
+                                        self._config.confirm)
         self.tabs = QTabWidget()
         self._specs = vs.tab_specs()
         self._tables: Dict[str, GroupTable] = {}
         for spec in self._specs:
-            if spec.group is None:
-                w: QWidget = QLabel(spec.note)
+            if spec.kind == vs.TAB_OPS:
+                w: QWidget = self.ops_tab
+            elif spec.kind == vs.TAB_SETTINGS:
+                w = self.settings_tab
+            elif spec.group is None:
+                w = QLabel(spec.note)
                 w.setAlignment(Qt.AlignCenter)
             else:
                 t = GroupTable()
@@ -183,6 +212,7 @@ class MainWindow(QMainWindow):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(LOG_MAX_LINES)
         self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.log.setFont(log_font(self.log.font()))
         self.clear_button.clicked.connect(self.log.clear)
         lg.addWidget(self.log)
 
@@ -239,8 +269,29 @@ class MainWindow(QMainWindow):
         """表示中のタブが項目表のとき、そのグループ名。"""
         return self._specs[self.tabs.currentIndex()].group
 
+    @property
+    def active_kind(self) -> str:
+        """表示中のタブの種類（vs.TAB_OPS など。項目表なら空）。"""
+        return self._specs[self.tabs.currentIndex()].kind
+
     def _apply_tab_poll(self) -> None:
-        """表示中の項目表のグループだけを "tab" としてポーリングする。離れたら解除する。"""
+        """表示中のタブに応じたポーリングを設定し、離れたものは解除する。
+
+        項目表は "tab"、操作タブは "ops"、設定タブは "settings"。
+        """
+        kind = self.active_kind
+        if kind == vs.TAB_OPS:
+            self.worker.set_poll(vs.OPS_POLL, vs.OPS_POLL_KEYS, vs.OPS_PERIOD_S)
+        else:
+            self.worker.clear_poll(vs.OPS_POLL)
+        if kind == vs.TAB_SETTINGS:
+            keys = [i.key for i in self.settings_tab.edit.items] + [CONFIG_STATUS_KEY]
+            self.worker.set_poll(vs.SETTINGS_POLL, keys, vs.SETTINGS_PERIOD_S)
+            self.settings_tab.refresh(self.model)
+        else:
+            self.worker.clear_poll(vs.SETTINGS_POLL)
+        if kind == vs.TAB_OPS:
+            self.ops_tab.refresh(self.model, self._kind == vs.CONN_CONNECTED)
         g = self.active_group
         keys = vs.group_keys(self._items, g) if g else []
         if g and keys:
@@ -261,14 +312,31 @@ class MainWindow(QMainWindow):
         if self._dirty:
             self._dirty = False
             self.overview.refresh(self.model)
-            g = self.active_group
-            if g:
-                self._tables[g].refresh(self.model)
+            self._refresh_active()
+
+    def _refresh_active(self) -> None:
+        kind = self.active_kind
+        if kind == vs.TAB_OPS:
+            self.ops_tab.refresh(self.model, self._kind == vs.CONN_CONNECTED)
+        elif kind == vs.TAB_SETTINGS:
+            self.settings_tab.refresh(self.model)
+        g = self.active_group
+        if g:
+            self._tables[g].refresh(self.model)
 
     def handle(self, msg: Any) -> None:
         if isinstance(msg, wk.Values):
             self.model.update(msg.timestamp, msg.values)
             self._dirty = True
+            return
+        if isinstance(msg, wk.ReadResult):
+            if msg.values:
+                self.model.update(msg.timestamp, msg.values)
+                self._dirty = True
+            if SettingsTab.owns(msg.request.tag):
+                self.settings_tab.on_read_result(msg, self.model)
+            for text in msg.errors:
+                self.log_warn("読み出し失敗: " + text)
             return
         if isinstance(msg, wk.Stats):
             self.stats_label.setText(vs.format_stats(msg))
@@ -278,19 +346,26 @@ class MainWindow(QMainWindow):
             self._items = list(msg.items)
             for g, t in self._tables.items():
                 t.set_items([i for i in self._items if i.group == g])
+            self.settings_tab.set_items([i for i in self._items if i.group == "settings"])
             self._set_kind(vs.CONN_CONNECTED)
             self.conn_bar.set_info(vs.device_info_text(msg))
             self._apply_tab_poll()
             self._dirty = True
         elif isinstance(msg, wk.Disconnected):
             self._set_kind(vs.conn_kind(msg))
+        elif isinstance(msg, wk.WriteResult) and SettingsTab.owns(msg.request.tag):
+            self.settings_tab.on_write_result(msg)
         for e in vs.log_entries(msg):
             self._append_log(e)
 
     def _set_kind(self, kind: str) -> None:
         self._kind = kind
         self.conn_bar.set_kind(kind)
-        self.overview.setEnabled(kind == vs.CONN_CONNECTED)
+        connected = kind == vs.CONN_CONNECTED
+        self.overview.setEnabled(connected)
+        self.ops_tab.setEnabled(connected)
+        self.settings_tab.set_connected(connected)
+        self._dirty = True
 
     @property
     def conn_kind(self) -> str:
@@ -299,8 +374,22 @@ class MainWindow(QMainWindow):
     # ---- ログ ----
 
     def _append_log(self, e: vs.LogEntry) -> None:
-        color = vs.LEVEL_COLORS[e.level]
-        self.log.appendHtml(f'<span style="color:{color}">[{vs.stamp()}] {html.escape(e.text)}</span>')
+        """1 行追加する。HTML は使わず、色（前景色）だけを書式に持たせる。
+
+        appendHtml だと HTML 取り込みでフォントの扱いが行ごとに変わりうる。ここでは文字書式にフォントを含めない
+        ので、全行が log のフォント（log_font）で描かれる。
+        """
+        sb = self.log.verticalScrollBar()
+        follow = sb.value() >= sb.maximum() - 2
+        cur = QTextCursor(self.log.document())
+        cur.movePosition(QTextCursor.End)
+        if cur.position() > 0:
+            cur.insertBlock(QTextBlockFormat(), QTextCharFormat())
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(vs.LEVEL_COLORS[e.level]))
+        cur.insertText(f"[{vs.stamp()}] {e.text}", fmt)
+        if follow:
+            sb.setValue(sb.maximum())
 
     def log_info(self, text: str) -> None:
         self._append_log(vs.LogEntry(text))

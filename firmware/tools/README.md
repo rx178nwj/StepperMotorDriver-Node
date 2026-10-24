@@ -130,7 +130,7 @@ python -m unittest discover -s tests
 
 # nemagui
 
-`nemadbg` と同じ USB CDC で基板につなぐ PC 側のデバッグ GUI（PySide6）。現状は画面の骨格（G2）で、接続・状態概要・非常停止・内部状態の項目表・ログ・統計までを備える。操作タブ・設定タブ・グラフは今後実装する（タブはプレースホルダ）。
+`nemadbg` と同じ USB CDC で基板につなぐ PC 側のデバッグ GUI（PySide6）。現状は接続・状態概要・非常停止・操作タブ・設定タブ・内部状態の項目表・ログ・統計までを備える。グラフは今後実装する（タブはプレースホルダ）。
 
 ## インストールと起動
 
@@ -147,7 +147,14 @@ python -m unittest discover -s tests
 ## 画面
 
 - 左: ESTOP（非常停止）・STOP（減速停止）と、常時表示の状態概要（STATE の色、FAULT / STATUS / INPUT_STATUS / CONFIG_STATUS のビットランプ、位置・速度・VM・温度など）。切断中はグレーアウトする。
-- 中央のタブ: 内部状態（モーション・状態遷移・監視・センサ・J10・原点・通信統計・診断・その他）の項目表。表示中のタブの項目だけを読む。累積カウンタは値の横に `+N/s` を出す。
+- 中央の「操作」タブ: ENABLE / DISABLE / CLEAR_FAULT、位置決め（目標値の絶対移動・相対移動、−6400 / −200 / +200 / +6400 のクイック相対）、速度指令（RUN_SPEED と「速度 0」）、SET_POSITION / SYNC_POSITION / RESET_ELEC_ANGLE、原点復帰（HOME_NEG / HOME_POS）。上部に STATE・位置・速度・目標到達・HOMING / HOMED / HOME_FAILED / LIMIT_STOP・J10_MODE を小さく表示する。
+  - ボタンは usb_interface.md 8.5 の受付条件に合わないとき無効になり、ツールチップに理由を出す（ENABLE は DISABLED のみ、移動・速度指令は ENABLED かつ原点復帰中でない、SET_POSITION などは停止中かつ原点復帰中でない、HOME_* は ENABLED・停止中・J10_MODE=2。未接続はすべて無効。移動方向のリミットは基板に任せる）。これは GUI 側の目安で、最終判断は基板（拒否されるとログに REJECTED が出る）。
+  - 表示中だけ J10_MODE を 100 ms ごとに読む（ポーリング組 `ops`）。
+- 中央の「設定」タブ: RW レジスタ全部を、表示名・基板の値・編集値・単位・範囲・名前・書き込み結果の表で出す。編集値が基板の値と違う行は黄色で強調する。整数はスピンボックス（範囲外は入力できない）、MICROSTEP・PA7_MODE・J10_MODE はコンボ、FLAGS はビットごとのチェックボックス。
+  - 「変更を書き込み」は変更行だけを順に送り、行ごとに OK / REJECTED / INVALID / 不明を出し、全結果が返ったら読み直す。「読み直し」は基板の値を取り直して編集値を戻す。編集中の値はポーリングで上書きしない（基板の値の列だけ更新）。
+  - CONFIG_STATUS のランプ（UNSAVED のときは橙の帯でも知らせる）。「Flash に保存」「Flash から読み直し」「工場出荷値（RAM のみ）」は停止中のみ有効で、後ろ 2 つは確認ダイアログを出す。実行後に設定を読み直す。
+  - 表示中だけ設定値と CONFIG_STATUS を 1 秒ごとに読む（ポーリング組 `settings`）。
+- 中央のその他のタブ: 内部状態（モーション・状態遷移・監視・センサ・J10・原点・通信統計・診断・その他）の項目表。表示中のタブの項目だけを読む。累積カウンタは値の横に `+N/s` を出す。
 - 下: ログ（接続・切断・異常通知・書き込み結果・注意。最大 5000 行）。ステータスバーに通信統計。
 
 ## ショートカット
@@ -158,4 +165,4 @@ python -m unittest discover -s tests
 
 ## テスト
 
-`tests/test_gui_qt.py` は `QT_QPA_PLATFORM=offscreen` で動く（PySide6 が無ければスキップ）。画面を介さない表示ロジックは `nemagui/viewstate.py` にあり `tests/test_gui_viewstate.py` で試験する。
+`tests/test_gui_qt.py` は `QT_QPA_PLATFORM=offscreen` で動く（PySide6 が無ければスキップ）。画面を介さない表示ロジック（操作の受付条件を含む）は `nemagui/viewstate.py`、設定タブの編集状態は `nemagui/settings_edit.py` にあり、`tests/test_gui_viewstate.py`・`tests/test_gui_settings_edit.py` で試験する。設定タブの確認ダイアログは `AppConfig.confirm`（または `SettingsTab.confirm`）で差し替えられる。
