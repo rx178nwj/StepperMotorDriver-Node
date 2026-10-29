@@ -7,12 +7,15 @@ import struct
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from . import dfu as dfu_mod
 from . import elfinfo
 from . import protocol as p
 from . import registers as regs_mod
+from .canbus import DEFAULT_BITRATE as DEFAULT_CAN_BITRATE, DEFAULT_INTERFACE as DEFAULT_CAN_INTERFACE
+from .scope import DEFAULT_VISA as DEFAULT_SCOPE_VISA
 from .link import (DEFAULT_TIMEOUT_S, ConnectInfo, DeviceError, Link, LinkError, SymInfo,
                    UnsafeRetryError, find_ports, open_serial)
 
@@ -307,6 +310,29 @@ def cmd_dfu(args: argparse.Namespace, link: Link, ci: ConnectInfo) -> int:
     return rc
 
 
+def cmd_selftest(args: argparse.Namespace, link: Link, ci: ConnectInfo) -> int:
+    from . import selftest as st   # オシロ・CAN 用の import は該当グループの実行時まで遅延する
+
+    if not 250 <= args.current <= 3000:
+        raise CliError("--current は 250〜3000 [mA] にしてください")
+    if not 0 < args.speed <= 20:
+        raise CliError("--speed は 0 より大きく 20 [rev/s] 以下にしてください")
+    if args.can_node is not None and not 0 <= args.can_node <= 7:
+        raise CliError("--can-node は 0〜7 にしてください")
+    if args.can_bitrate <= 0:
+        raise CliError("--can-bitrate は正の値にしてください")
+    only = "".join(sorted(set(args.only.replace(",", "").upper())))
+    if not only or any(c not in st.SELECTABLE for c in only):
+        raise CliError(f"--only は {','.join(st.SELECTABLE)} のカンマ区切りで指定してください")
+    out_dir = args.out or str(Path("selftest_reports") / datetime.now().strftime("%Y%m%d-%H%M%S"))
+    opts = st.SelftestOptions(
+        current_ma=args.current, speed_rev_s=args.speed, no_scope=args.no_scope, scope_visa=args.scope_visa,
+        no_can=args.no_can, can_interface=args.can_interface, can_channel=args.can_channel,
+        can_bitrate=args.can_bitrate, can_node=args.can_node, no_motion=args.no_motion, yes=args.yes,
+        only=only, out_dir=out_dir, sim=args.sim)
+    return st.SelfTest(link, ci, opts, args.selftest_env or st.SelftestEnv(), args.prompt).run()
+
+
 # ---- 引数 ----
 
 def build_parser() -> argparse.ArgumentParser:
@@ -346,13 +372,30 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--count", type=int, default=None, help="回数（省略時は Ctrl-C まで）")
     sp = add("dfu", cmd_dfu, "ROM ブートローダ（USB DFU）へ移行（書き込みは行わない）")
     sp.add_argument("--yes", "-y", action="store_true", default=False, help="確認プロンプトを省略")
+    sp = add("selftest", cmd_selftest, "動作確認モード（A 立ち上げ・B 角度センサ・C モーター・D オシロ・E CAN を自動試験）")
+    sp.add_argument("--yes", "-y", action="store_true", default=False, help="モーター回転前の確認プロンプトを省略")
+    sp.add_argument("--no-motion", action="store_true", default=False, help="モーターを回さない（C と D を SKIP）")
+    sp.add_argument("--no-scope", action="store_true", default=False, help="オシロを使わない（D を SKIP）")
+    sp.add_argument("--scope-visa", default=DEFAULT_SCOPE_VISA, metavar="RESOURCE",
+                    help=f"オシロの VISA リソース（既定 {DEFAULT_SCOPE_VISA}）")
+    sp.add_argument("--no-can", action="store_true", default=False, help="CAN を使わない（E を SKIP）")
+    sp.add_argument("--can-interface", default=DEFAULT_CAN_INTERFACE,
+                    help=f"python-can のインタフェース（既定 {DEFAULT_CAN_INTERFACE}。slcan も可）")
+    sp.add_argument("--can-channel", default=None, help="CAN チャンネル（slcan は COMx。gs_usb は省略可）")
+    sp.add_argument("--can-bitrate", type=int, default=DEFAULT_CAN_BITRATE, help=f"CAN ビットレート [bit/s]（既定 {DEFAULT_CAN_BITRATE}）")
+    sp.add_argument("--can-node", type=int, default=None, help="CAN の基板 ID 0〜7（省略時は CONNECT 応答の BOARD_ID）")
+    sp.add_argument("--current", type=int, default=1500, help="試験電流 [mA]（既定 1500）")
+    sp.add_argument("--speed", type=float, default=1.0, help="試験速度 [rev/s]（既定 1.0）")
+    sp.add_argument("--only", default="A,B,C,D,E", help="実行するグループ（例 A,B。既定は全部）")
+    sp.add_argument("--out", default=None, metavar="DIR", help="レポートの出力先（既定 ./selftest_reports/YYYYmmdd-HHMMSS/）")
     sp = add("events", cmd_events, "イベントを表示し続ける")
     sp.add_argument("--duration", type=float, default=None, help="秒数（省略時は Ctrl-C まで）")
     return ap
 
 
 def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any], Link]] = None,
-         prompt: Callable[[str], str] = input, dfu_tools: Optional[dfu_mod.DfuTools] = None) -> int:
+         prompt: Callable[[str], str] = input, dfu_tools: Optional[dfu_mod.DfuTools] = None,
+         selftest_env: Any = None) -> int:
     args = build_parser().parse_args(argv)
     args.port = getattr(args, "port", None)
     args.elf = getattr(args, "elf", None)
@@ -361,6 +404,7 @@ def main(argv: Optional[List[str]] = None, link_factory: Optional[Callable[[Any]
     args.sim = getattr(args, "sim", False)
     args.prompt = prompt
     args.dfu_tools = dfu_tools or dfu_mod.DfuTools()
+    args.selftest_env = selftest_env   # selftest の時計・オシロ・CAN の差し替え（試験用。None なら実物）
     args.no_disconnect = False   # dfu は移行後に COM ポートが消えるため DISCONNECT を送らない
     if args.command == "read-var" and not args.elf:
         print("エラー: read-var には --elf が必要です", file=sys.stderr)

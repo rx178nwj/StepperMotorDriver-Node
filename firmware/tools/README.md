@@ -37,6 +37,7 @@ python -m nemadbg [--port COMx] [--elf PATH] [--timeout MS] [--sim] <サブコ�
 | `watch NAME... --interval SEC [--count N]` | 周期読み出し（Ctrl-C で終了） |
 | `events [--duration SEC]` | イベント（異常通知など）を表示し続ける |
 | `dfu [--yes]` | ROM ブートローダ（USB DFU）へ移行する（3.13 節）。確認プロンプトの後に CONNECT → ENTER_BOOTLOADER（KEY `0x544F4F42`）を送る。書き込みは行わない |
+| `selftest [オプション]` | 動作確認モード。基板を自動試験して項目ごとの PASS/FAIL/SKIP/INFO を表示・保存する（下の「動作確認モード」） |
 
 ### dfu
 
@@ -110,19 +111,123 @@ sim.set_vm_mv(5000)                  # 注入 API: VM 低下 -> FAULT とイベ�
 - 保存設定はプロセス内のメモリ（既定は保存済みの工場値から始まる。`blank_flash=True` で未保存）。基板温度・MCU 温度・VM には小さな揺らぎが付く（`noise=False` で無効、`seed` で再現可能）。
 - `loop.*`・`stack.*` はそれらしい固定値。`reset_csr` は電源投入相当（BORRSTF | PINRSTF）。
 
+## 動作確認モード（`selftest`）
+
+基板（STM32L433 + TB67S249FTG、FW 0.4）を PC から自動試験し、項目ごとの結果・測定値・しきい値を表示して、`report.txt` と `report.json` に保存する。試験用のモーターは 23HS8430（NEMA23、200 step/rev、3.0 A/相）を無負荷で接続する。VM は 12 V。
+
+```powershell
+python -m nemadbg selftest                         # 全グループ。モーターを回す前に確認する
+python -m nemadbg selftest --yes --current 1500 --speed 1.0
+python -m nemadbg selftest --no-motion --no-scope --no-can   # A・B だけ（回さない）
+python -m nemadbg selftest --only A,B --out C:\work\report1
+python -m nemadbg --sim selftest --yes --out $env:TEMP\st    # 擬似デバイスで A〜C
+```
+
+### 必要なパッケージ
+
+A〜C だけなら追加は不要（`requirements.txt`）。D（オシロ）と E（CAN）を使うときだけ、次を入れる。
+
+```powershell
+.venv\Scripts\python -m pip install -r requirements-selftest.txt   # pyvisa と python-can
+```
+
+- pyvisa / python-can は該当グループの実行時だけ import する。未インストール・機器が見つからない場合は、そのグループを `SKIP`（理由つき）にして続ける。
+- オシロは NI-VISA が必要（`docs/oscilloscope_ds1054z.md`）。CAN アダプタ DSD TECH SH-C30L は、candleLight ファームなら `gs_usb`（既定）、slcan ファームなら `--can-interface slcan --can-channel COM5`。どちらも python-can 経由。
+
+### 配線
+
+| オシロ | 接続先 |
+|---|---|
+| CH1 | DRV_VREF |
+| CH2 | DRV_CLK |
+| CH3 | DRV_DIR |
+| CH4 | 使わない |
+
+- プローブのグラウンドは回路の GND に付ける（`docs/oscilloscope_ds1054z.md` の注意を参照）。プローブ本体の ×1/×10 の切替と、オシロ側のプローブ倍率の設定を合わせておく（selftest は倍率を変えない）。
+- CAN は J1/J2（CANH/CANL/GND）にアダプタをつなぐ。500 kbit/s。バスの両端だけ終端 120 Ω（本機は DIP SW2 の 4 極目 CAN_TERM、アダプタ側にも終端が要る）。ACK を返す相手（アダプタ）が必要。
+- 要求の CAN ID は 0x100 + 基板 ID。基板 ID は CONNECT 応答の BOARD_ID を使う。違う値にしたいときは `--can-node 0〜7`。
+
+### オプション
+
+| オプション | 既定 | 内容 |
+|---|---|---|
+| `--yes`, `-y` | - | モーター回転前の確認プロンプトを省略 |
+| `--no-motion` | - | モーターを回さない（C を SKIP。D も SKIP） |
+| `--no-scope` | - | オシロを使わない（D を SKIP） |
+| `--scope-visa RESOURCE` | `USB0::0x1AB1::0x04CE::DS1ZA221001740::INSTR` | オシロの VISA リソース |
+| `--no-can` | - | CAN を使わない（E を SKIP） |
+| `--can-interface` | `gs_usb` | python-can のインタフェース（`slcan` も可） |
+| `--can-channel` | なし | `slcan` は COMx が必須。`gs_usb` は省略可（数字ならアダプタの index） |
+| `--can-bitrate` | 500000 | CAN ビットレート |
+| `--can-node` | BOARD_ID | 要求を送る基板 ID（0〜7） |
+| `--current mA` | 1500 | 試験電流（RUN_CURRENT、250〜3000） |
+| `--speed rev/s` | 1.0 | 試験速度（1 rev/s は 200 × MICROSTEP step/s） |
+| `--only A,B,...` | A,B,C,D,E | 実行するグループ（D だけ指定しても C の動作中に測る。C の項目は出さない） |
+| `--out DIR` | `./selftest_reports/YYYYmmdd-HHMMSS/` | レポートの出力先 |
+
+共通オプション `--sim` を付けると A〜C を擬似デバイスで実行し（VM は 12 V にする）、D・E は SKIP する。FAIL が 1 つでもあれば終了コード 1、それ以外は 0。使い方の誤りも 1。
+
+### 出力
+
+- 標準出力と `report.txt`: 1 項目 1 行（結果・グループ・項目 ID・項目名・測定値・基準・備考）と、最後に集計。
+- `report.json`: 実行日時、DUT（DEVICE_ID・FW 版数・BOARD_ID）、実行条件、`items`（`id` `group` `name` `result` `value` `unit` `limit` `note`）、集計。
+- D を実行したときは `scope_clk_edges.csv`（立ち上がりの時刻）と `scope_clk_wave.csv`（間引いた波形）も保存する。
+
+### 試験項目と判定基準
+
+| ID | 内容 | 判定 |
+|---|---|---|
+| A.device_id | DEVICE_ID | = 0xA3（FW 版数・BOARD_ID は INFO） |
+| A.vm | `mon.vm_mv` | 10800〜13200 mV |
+| A.vdda | `mon.vdda_mv` | 3200〜3400 mV |
+| A.mcu_temp / A.board_temp | `mon.mcu_temp_dc` / `mon.board_temp_dc`（0.1 ℃） | 0〜60 ℃（基板温度が無効値なら FAIL） |
+| A.stack | `stack.used_max` / `stack.size` | < 80 % |
+| A.loop_rate / A.loop_max / A.reset_csr | `loop.rate_hz` / `loop.max_us` / `reset_csr` | INFO |
+| A.usb_errors | `usb_stats` の crc_errors・dropped・rx_overflow・rx_timeouts・bad_len・tx_dropped を最初と最後で比較 | 増加 0 |
+| B.i2c_ok / B.i2c_fail | `sensor.i2c_ok` / `sensor.i2c_fail` を 1 秒間隔で 2 回読む | 成功は増加、失敗は増えない |
+| B.fail_streak | `sensor.fail_streak` | = 0 |
+| B.magnet | `sensor.as_status`（AS5600 STATUS: bit5 MD、bit4 ML、bit3 MH） | MD=1、ML=0、MH=0（無応答中の古い値は FAIL） |
+| B.agc | `agc_out`（AGC0/AGC1 端子の出力レベル） | INFO |
+| C.setup | RUN_CURRENT = `--current`、MAX_SPEED = `200 × MICROSTEP × --speed` を書く | CMD_RESULT = OK |
+| C.enable | CLEAR_FAULT → ENABLE | STATE = ENABLED |
+| C.fwd_pos / C.rev_pos | MOVE_REL ±(200 × MICROSTEP) step | `position` の差分が完全一致（逆転は元の位置に戻る）。完了待ちのタイムアウトは 予想時間 × 3 + 2 s |
+| C.fwd_angle / C.rev_angle | `shaft_angle`（0.01°）を移動中に読み、折り返しを補正した回転量の絶対値 | 360° × 200 / (GEAR_RATIO × STEPS_PER_REV) の ±5° × その割合（GEAR_RATIO=1・STEPS_PER_REV=200 なら 360°±5°、下限 0.5°）。符号は INFO（C.fwd_sign / C.rev_sign） |
+| C.run_speed | RUN_SPEED を約 2 秒、`cur_speed` の平均 | 指令（200 × MICROSTEP × --speed）の ±5 % |
+| C.stop | STOP | `running` = 0 |
+| C.restore | STOP → DISABLE、RUN_CURRENT・MAX_SPEED を元値に戻す | 元値に一致、STATE ≠ ENABLED |
+| D.vref | CH1（DRV_VREF）平均 × 1.25 | `--current` の ±10 %（1.5 A なら 1.20 V）。RUN_SPEED 中に測る |
+| D.clk_freq | CH2（DRV_CLK）の周波数（RUN_SPEED 中） | `200 × MICROSTEP × --speed` Hz の ±2 % |
+| D.clk_edges | 正転 MOVE_REL 中に CH2 を単発・RAW メモリ（12M 点）で取り込み、立ち上がり数を数える（0.8 V 以下から 2.0 V 以上でカウント） | 指令 step 数に一致 |
+| D.dir | CH3（DRV_DIR）の平均電圧を正転後・逆転後（静止中）に測る | 一方が 1.0 V 以下、他方が 2.3 V 以上（反転している） |
+| E.device_id / E.board_id | `02 00 01` / `02 03 01` を送る | `82 00 A3` / `82 03 <ID>` |
+| E.state / E.position | `02 04 02` / `02 08 04` | `82 04 <STATE> <FAULT>`、POSITION は USB で読んだ値と一致 |
+| E.invalid | `05 04 01`（未定義 OP） | `FF 04 02` |
+| E.err_busoff / err_passive / err_rx_overrun | `comm_stats.*` を E の前後で比較 | 0 のまま増えない |
+| E.rx_frames / E.tx_frames | `comm_stats.rx_frames` / `tx_frames` | 増加 |
+
+読み出し要求は応答が無ければ 3 回まで再送する。E は読み出しだけで、書き込み・COMMAND は送らない。
+
+### 安全のための動作
+
+- `SAVE_SETTINGS` は送らない。変えるのは RAM 上の RUN_CURRENT と MAX_SPEED だけで、終了時に元へ戻す。ただし CONFIG_STATUS の UNSAVED ビットは立ったままになる（電源再投入で消える。Flash の内容は変わらない）。
+- 例外・Ctrl+C を含めどの経路でも、最後に STOP → DISABLE を送り、設定を戻す。Ctrl+C のときは項目 `X.abort`（FAIL）を記録してレポートを書く。
+- オシロとの通信エラーは、DUT の故障とは区別して該当項目を `SKIP`（理由つき）にし、モーターの試験は続ける。
+- 1 回転ぶんの角度は、移動中に `shaft_angle` を約 20〜30 ms 間隔で読み、1 回ごとの変化を ±180° に折り返して足し合わせる（始点と終点だけでは 1 回転が 0° に見えるため）。このため 1 サンプル間で 180° 以上回る高速では誤判定する（既定の 1 rev/s では余裕がある）。
+- 無負荷直結でセンサが出力軸に付く構成では GEAR_RATIO を 1 にしておく（既定 20 のままだと、1 回転の軸角度は 18° になる）。selftest は GEAR_RATIO を変更しない。
+
 ## 終了コード
 
 | コード | 意味 |
 |---|---|
 | 0 | 正常 |
-| 1 | エラー（基板が ERR≠0 を返した、無応答、ポート異常、引数の誤り、ELF 異常、`dfu` の中止・DFU デバイス未検出） |
+| 1 | エラー（基板が ERR≠0 を返した、無応答、ポート異常、引数の誤り、ELF 異常、`dfu` の中止・DFU デバイス未検出、`selftest` の FAIL あり） |
 | 2 | build-id 不一致（`info --elf`、`read-var`） |
 
 引数の誤り（argparse）も 2 ではなく 1 で終了する。
 
 ## テスト
 
-ハードウェア不要。擬似デバイス（`tests/fakedevice.py`）とシミュレータ（`tests/test_sim.py`）で動かす。
+ハードウェア不要。擬似デバイス（`tests/fakedevice.py`）とシミュレータ（`tests/test_sim.py`）で動かす。`selftest` は `tests/test_selftest.py`（sim に偽オシロ・偽 CAN バスを注入）。
 
 ```powershell
 python -m unittest discover -s tests
