@@ -22,7 +22,8 @@ App/Src/*.c 末尾の SYM_ENTRY（104 件）に合わせてある。サイクル
       （HOME1 は POSITION >= home1_pos、HOME2 は POSITION <= home2_pos）。スイッチが無い側へ探索すると
       home_travel_limit（既定 100000 step）動いたところで失敗にする（実機は機械端まで動き続ける）。
     - エンコーダ（J10_MODE=1）の ENC_COUNT は位置に追従する（モード切替時に 0 から数え始める）。
-    - 通信は CAN バスを持たない。comm_stats.* は常に 0。USB の受信タイムアウト（20 ms）は再現するが、
+    - 通信は CAN バスを持たない。comm_stats.* は常に 0。通信タイムアウトの計時は CAN 受信だけが延ばすので、sim では延びない
+      （COMM_TIMEOUT≠0 で運転すると、USB の要求を送り続けてもタイムアウトで減速停止する）。USB の受信タイムアウト（20 ms）は再現するが、
       送信詰まり（50 ms）は再現しない。SAVE_SETTINGS の応答遅れ（約 25 ms）は再現しない（loop.max_us にだけ反映）。
     - 保存設定（Flash）はプロセス内のメモリで持つ。`blank_flash=True` なら未保存（LOADED=0）で始まる。
     - 基板温度・MCU 温度・VM には小さな揺らぎを付ける（noise=False で無効、seed で再現可能）。
@@ -1724,7 +1725,7 @@ class SimSerial:
             return 0, b"\x00"
         if can_id != CAN_ID_REQUEST_BASE + b.board_id:
             return 0, b"\x00"
-        b.last_request_ms = b.now
+        # 通信タイムアウトの計時は USB 経由の CAN_REQUEST では延ばさない（実機は CAN 受信だけが延ばす。sim は CAN バスが無い）
         op = data[0] if dlc >= 1 else 0
         reg = data[1] if dlc >= 2 else 0
         if op == 0x01 and 3 <= dlc <= 8:

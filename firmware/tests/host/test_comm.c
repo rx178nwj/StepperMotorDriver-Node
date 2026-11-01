@@ -740,16 +740,25 @@ static void test_timeout_timer(void)
         CHECK(comm_last_request_ms() == 5500u);
         g_tx_free = 3;
 
-        /* USB 経由（comm_process_request を直接呼ぶ）でも、自局宛てならリセットする（FR-USB-42） */
+        /* USB 経由（comm_process_request を直接呼ぶ）では、自局宛てでもリセットしない（FR-USB-42）。
+         * 計時のリセットは CAN 受信経路（comm_poll）だけが行う */
         g_tick = 5600;
         uint8_t n;
         (void)proc((uint16_t)(0x100u + board), 3, rd, &n);
-        CHECK(n == 1u);
-        CHECK(comm_last_request_ms() == 5600u);
+        CHECK(n == 1u);                                  /* 要求自体は処理され、応答は作られる */
+        CHECK(comm_last_request_ms() == 5500u);
+        (void)proc((uint16_t)(0x100u + board), 3, wr, &n);
+        (void)proc((uint16_t)(0x100u + board), 3, (const uint8_t[]){0x77, 0, 0}, &n);
+        CHECK(comm_last_request_ms() == 5500u);
         g_tick = 5700;
         (void)proc(CAN_ID_BROADCAST, 1, (const uint8_t[]){CMD_STOP}, &n);
         (void)proc((uint16_t)(0x100u + ((board + 1u) & 7u)), 3, rd, &n);
-        CHECK(comm_last_request_ms() == 5600u);
+        CHECK(comm_last_request_ms() == 5500u);
+
+        /* USB 経由の後でも、CAN で自局宛てを受ければリセットする */
+        g_tick = 5800;
+        rx((uint16_t)(0x100u + board), 3, rd);
+        CHECK(comm_last_request_ms() == 5800u);
     }
 }
 

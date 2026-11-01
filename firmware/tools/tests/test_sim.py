@@ -491,12 +491,11 @@ class MotionTest(SimCase):
     def test_comm_timeout_stops_motion(self) -> None:
         self.assertEqual(self.wr(R_COMM_TIMEOUT, struct.pack("<H", 100)), OK)
         self.wr32(R_RUN_SPEED, 1600)
-        # 50 ms ごとに要求を送り続けるあいだは走り続ける
+        # USB の CAN_REQUEST（読み出し）を 50 ms ごとに送り続けても通信タイムアウトは延びない
+        # （計時を延ばすのは CAN 受信だけ。sim には CAN バスが無い）。よって減速停止する
         for _ in range(10):
             self.advance(0.05)
-            self.assertEqual(self.u(R_STATE), 2)
-        self.assertEqual(self.u(R_SPEED, 4, True), 1600)
-        # 要求が途絶えたら減速停止
+            self.u(R_STATE)
         self.advance(0.6)
         self.assertEqual(self.u(R_SPEED, 4, True), 0)
         self.assertFalse(self.u(R_STATUS) & 0x01)

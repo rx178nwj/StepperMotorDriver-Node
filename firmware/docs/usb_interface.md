@@ -412,7 +412,7 @@ FLAGS のビット: bit0 方向反転、bit1 ローカルジョグ有効、bit2 
 
 ### 8.6 動作上の注意
 
-- **通信タイムアウト（COMM_TIMEOUT≠0）**: ジョグ中を除き、最後の自局宛て要求から指定 ms を超えると減速停止する。USB のときは、**CAN_REQUEST を定期的に送り続ける（状態の読み出しで構わない）ことが生存通知になる**。自局宛て 0x100+ID 要求のみが対象で、ブロードキャストや CONNECT・GET_VERSION は対象外。
+- **通信タイムアウト（COMM_TIMEOUT≠0）**: ジョグ中を除き、最後の自局宛て要求から指定 ms を超えると減速停止する。計時をリセットするのは **CAN で受信した自局宛て 0x100+ID 要求だけ**で、**USB の CAN_REQUEST は計時を延ばさない**（生存通知にならない。ブロードキャストや CONNECT・GET_VERSION も対象外）。COMM_TIMEOUT≠0 で CAN の要求が来ない状態（USB だけで運転する場合）では、運転を始めるとタイムアウトで減速停止するので、USB だけで試すときは COMM_TIMEOUT=0 のままにする。
 - **原点復帰**（J10_MODE=2）: HOME1（＋側）・HOME2（−側）入力。探索速度は min(HOME_SPEED, MAX_SPEED)。完了で POSITION=0・INPUT_STATUS bit3。失敗は bit4。STOP・ESTOP・DISABLE・通信タイムアウト・FAULT で中止。
 - **リミット停止**: J10_MODE=2 のとき、作動中の側へ動くと ESTOP し INPUT_STATUS bit5 を立てる（FAULT にはならない）。逆方向へは動ける。
 - **設定変更後**: 変更は RAM に反映され CONFIG_STATUS bit1（UNSAVED）が立つ。電源を切っても残すには SAVE_SETTINGS（COMMAND=7）。
@@ -485,7 +485,7 @@ ENTER_BOOTLOADER（CMD 0x50）で本機を STM32 の ROM ブートローダ（US
 ```
 CONNECT
 write COMM_TIMEOUT 等の設定（必要なら）→ 保存
-loop: read STATE/STATUS ...                    # 生存通知を兼ねる
+loop: read STATE/STATUS ...                    # USB の読み出しは COMM_TIMEOUT の生存通知にならない
 STATE==DISABLED なら COMMAND=ENABLE → STATE==ENABLED を確認
 MOVE_ABS / MOVE_REL / RUN_SPEED を書く
 STATUS.bit7(目標到達) または POSITION で完了を判定
@@ -497,7 +497,7 @@ DISCONNECT
 
 ### 10.4 推奨ポーリング周期
 
-状態読み出しは 20〜100 ms 周期を推奨。COMM_TIMEOUT を使う場合は、その 1/3 以下の周期で何らかの CAN_REQUEST を送る。応答を読み続けること（読まないと本機の送信が詰まり、50 ms 後に応答を破棄し要求も無視される）。
+状態読み出しは 20〜100 ms 周期を推奨。COMM_TIMEOUT の生存通知は CAN 側の要求だけが担い、USB の CAN_REQUEST は計時を延ばさない。応答を読み続けること（読まないと本機の送信が詰まり、50 ms 後に応答を破棄し要求も無視される）。
 
 ---
 

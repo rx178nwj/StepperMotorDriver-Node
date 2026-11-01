@@ -82,7 +82,8 @@ extern volatile comm_diag_t comm_diag;
  * can_id/dlc/data で受け取ったフレームを処理し、送信すべき応答フレームを resp に作る。
  * 戻り値は応答フレーム数（0 または 1、resp_max が上限）。
  *   - 0x000 でも 0x100+ID でもないフレームは無視する（0 を返す。FR-COM-04）
- *   - 0x100+ID を受けると通信タイムアウトの計時をリセットする（FR-MON-09）
+ *   - 通信タイムアウトの計時（FR-MON-09）はここではリセットしない。CAN 受信経路（comm_poll）だけが
+ *     0x100+ID 受信時にリセットする（USB の CAN_REQUEST から呼ばれても計時は延びない）
  *   - 0x000（ブロードキャスト）は DISABLE/STOP/ESTOP のみ実行し、応答しない
  * data は dlc バイト以上有効であること。main ループから呼ぶ。
  */
@@ -106,7 +107,7 @@ void comm_notify_fault(uint8_t state, uint8_t fault);
 /* 自局の ID（DIP 値 0〜7。comm_init で渡されたもの。USB の CONNECT 応答用） */
 uint8_t comm_board_id(void);
 
-/* 自局宛て要求（0x100+ID、USB 経由を含む）を最後に受けた時刻 [ms]（FR-MON-09） */
+/* CAN で自局宛て要求（0x100+ID）を最後に受けた時刻 [ms]（FR-MON-09）。USB 経由の要求は含まない */
 uint32_t comm_last_request_ms(void);
 
 /* LED_COMM 用: CAN で自局宛て／ブロードキャストを受けるたびに増える */

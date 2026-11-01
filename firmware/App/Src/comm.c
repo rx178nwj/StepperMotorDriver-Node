@@ -55,7 +55,8 @@ uint8_t comm_process_request(uint16_t can_id, uint8_t dlc, const uint8_t *data,
         return 0;   /* 他局宛て・対象外 ID は無視（FR-COM-04） */
     }
 
-    last_request_ms = HAL_GetTick();
+    /* 通信タイムアウトの計時は、ここでは更新しない（USB の CAN_REQUEST からも呼ばれるため）。
+     * CAN 受信経路の comm_poll だけが更新する（FR-MON-09） */
     if (resp_max < 1u) {
         return 0;
     }
@@ -221,6 +222,11 @@ void comm_poll(void)
         /* FR-UI-04: 自局宛て／ブロードキャストの受信ごとに LED_COMM を点灯させる */
         if (e.id == CAN_ID_BROADCAST || e.id == (uint16_t)(CAN_ID_REQUEST_BASE + board_id)) {
             activity_count++;
+        }
+        /* FR-MON-09: 通信タイムアウトの計時は、CAN で受けた自局宛て（0x100+ID）要求だけがリセットする。
+         * ブロードキャスト・他局宛て・USB 経由の要求（comm_process_request 直呼び）は対象外 */
+        if (e.id == (uint16_t)(CAN_ID_REQUEST_BASE + board_id)) {
+            last_request_ms = HAL_GetTick();
         }
 
         comm_frame_t resp[COMM_RESP_MAX];
