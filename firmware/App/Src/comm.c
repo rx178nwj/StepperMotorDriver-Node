@@ -29,6 +29,7 @@ static bool fault_pending;         /* 異常通知が送信キューに入るま
 static comm_frame_t fault_frame;
 
 volatile comm_stats_t comm_stats;
+volatile comm_diag_t comm_diag;
 
 /* ---------------------------------------------------------------- 要求処理（トランスポート非依存） */
 
@@ -118,6 +119,7 @@ void comm_init(uint8_t id)
     hcan.Init.ReceiveFifoLocked = DISABLE;
     hcan.Init.TransmitFifoPriority = DISABLE;
     if (HAL_CAN_Init(&hcan) != HAL_OK) {
+        comm_diag.init_stage = COMM_INIT_FAIL_CAN_INIT;
         return;
     }
 
@@ -137,6 +139,7 @@ void comm_init(uint8_t id)
     f.FilterActivation = ENABLE;
     f.SlaveStartFilterBank = 14;
     if (HAL_CAN_ConfigFilter(&hcan, &f) != HAL_OK) {
+        comm_diag.init_stage = COMM_INIT_FAIL_FILTER;
         return;
     }
 
@@ -150,6 +153,9 @@ void comm_init(uint8_t id)
 
     if (HAL_CAN_Start(&hcan) == HAL_OK) {
         can_ready = true;
+        comm_diag.init_stage = COMM_INIT_RUNNING;
+    } else {
+        comm_diag.init_stage = COMM_INIT_FAIL_START;
     }
 }
 
@@ -173,8 +179,41 @@ static bool can_try_send(const comm_frame_t *f)
     return true;
 }
 
+/* CAN1->ESR を読んで comm_diag を更新する（comm_poll から 1 ms ごと。新しい割り込みは使わない）。
+ * 1 ms ごとのサンプリングなので、その間に複数回起きたエラーや短い EWGF は取りこぼす。
+ * lec_count / ewg_count は実際の回数の下限値。
+ * LEC はハードが上書きするまで保持されるため、読んだら 7（ソフトで書ける未使用コード）にして
+ * 次のエラー更新を検出できるようにする（RM0394） */
+static void diag_update(void)
+{
+    static bool prev_ewg;
+
+    uint32_t esr = CAN1->ESR;
+    uint32_t tec = (esr & CAN_ESR_TEC) >> CAN_ESR_TEC_Pos;
+    uint32_t rec = (esr & CAN_ESR_REC) >> CAN_ESR_REC_Pos;
+    bool ewg = (esr & CAN_ESR_EWGF) != 0u;
+    uint32_t lec = (esr & CAN_ESR_LEC) >> CAN_ESR_LEC_Pos;
+
+    comm_diag.esr = esr;
+    comm_diag.tec = tec;
+    comm_diag.rec = rec;
+    if (tec > comm_diag.tec_max) comm_diag.tec_max = tec;
+    if (rec > comm_diag.rec_max) comm_diag.rec_max = rec;
+    if (ewg && !prev_ewg) comm_diag.ewg_count++;
+    prev_ewg = ewg;
+
+    if (lec >= 1u && lec <= 6u) {
+        comm_diag.lec_count[lec - 1u]++;
+        CAN1->ESR = CAN_ESR_LEC;   /* LEC を 7 にする */
+    }
+}
+
 void comm_poll(void)
 {
+    if (can_ready) {
+        diag_update();
+    }
+
     while (rx_tail != rx_head) {
         rx_entry_t e = rx_ring[rx_tail];
         rx_tail = (uint8_t)((rx_tail + 1u) % RX_RING_LEN);
@@ -247,6 +286,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *h)
             continue;   /* フィルタで除外済みのはず（念のため） */
         }
         comm_stats.rx_frames++;
+        comm_diag.last_rx_id = hd.StdId;
+        comm_diag.last_rx_dlc = hd.DLC;
+        for (uint8_t i = 0; i < 8u; i++) {
+            comm_diag.last_rx_data[i] = d[i];
+        }
         uint8_t next = (uint8_t)((rx_head + 1u) % RX_RING_LEN);
         if (next == rx_tail) {
             comm_stats.rx_dropped++;
@@ -295,3 +339,18 @@ SYM_ENTRY(comm_stats.err_passive, SYM_U32, 1);
 SYM_ENTRY(comm_stats.err_busoff, SYM_U32, 1);
 SYM_ENTRY(comm_stats.err_rx_overrun, SYM_U32, 1);
 SYM_ENTRY(comm_stats.err_last_code, SYM_U32, 1);
+
+/* ---------------------------------------------------------------- USB 名前表（CAN 診断） */
+
+SYM_ENTRY(comm_diag, SYM_BYTES, sizeof(comm_diag));
+SYM_ENTRY(comm_diag.init_stage, SYM_U32, 1);
+SYM_ENTRY(comm_diag.esr, SYM_U32, 1);
+SYM_ENTRY(comm_diag.tec, SYM_U32, 1);
+SYM_ENTRY(comm_diag.rec, SYM_U32, 1);
+SYM_ENTRY(comm_diag.tec_max, SYM_U32, 1);
+SYM_ENTRY(comm_diag.rec_max, SYM_U32, 1);
+SYM_ENTRY(comm_diag.ewg_count, SYM_U32, 1);
+SYM_ENTRY(comm_diag.lec_count, SYM_U32, 6);
+SYM_ENTRY(comm_diag.last_rx_id, SYM_U32, 1);
+SYM_ENTRY(comm_diag.last_rx_dlc, SYM_U32, 1);
+SYM_ENTRY(comm_diag.last_rx_data, SYM_U8, 8);

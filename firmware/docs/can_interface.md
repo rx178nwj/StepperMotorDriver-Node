@@ -236,6 +236,8 @@ CAN_ID = 0x080+ID, DLC = 2, DATA = [STATE][FAULT]
 
 統計（`comm_stats`）は USB の名前表（`comm_stats`）でのみ読める。項目: rx_frames、rx_dropped、tx_frames、tx_dropped、err_events、err_passive、err_busoff、err_rx_overrun、err_last_code。電源再投入まで累積し、クリアの手段はない。
 
+診断情報（`comm_diag`）も名前表で読める。TEC/REC（と起動後の最大値）、LEC 別のエラー回数（Stuff/Form/ACK/Bit/CRC）、初期化の段階（失敗した HAL 関数）、直近に受信したフレームが分かる。TEC/REC/LEC は 1 ms ごとのサンプリングなので、回数は下限値。
+
 ---
 
 ## 9. マスタ実装ガイド

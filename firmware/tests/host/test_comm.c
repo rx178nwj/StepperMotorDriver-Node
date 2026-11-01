@@ -125,11 +125,12 @@ static unsigned g_filter_n;
 static CAN_InitTypeDef g_can_init;
 static uint32_t g_cans_at_start;       /* HAL_CAN_Start の時点の CAN_S 出力（BSRR の値） */
 static unsigned g_start_n;
+static int g_fail_init, g_fail_filter, g_fail_start;   /* 1 で該当 HAL 関数を失敗させる（comm_diag.init_stage 用） */
 
 HAL_StatusTypeDef HAL_CAN_Init(CAN_HandleTypeDef *h)
 {
     g_can_init = h->Init;
-    return HAL_OK;
+    return g_fail_init ? HAL_ERROR : HAL_OK;
 }
 
 HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef *h, CAN_FilterTypeDef *f)
@@ -137,7 +138,7 @@ HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef *h, CAN_FilterTypeDef *
     (void)h;
     g_filter = *f;
     g_filter_n++;
-    return HAL_OK;
+    return g_fail_filter ? HAL_ERROR : HAL_OK;
 }
 
 HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef *h, uint32_t it)
@@ -152,7 +153,7 @@ HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef *h)
     (void)h;
     g_cans_at_start = g_gpioc.BSRR;
     g_start_n++;
-    return HAL_OK;
+    return g_fail_start ? HAL_ERROR : HAL_OK;
 }
 
 uint32_t HAL_CAN_GetTxMailboxesFreeLevel(CAN_HandleTypeDef *h)
@@ -962,6 +963,78 @@ static void test_stats(void)
     g_can1.ESR = 0;
 }
 
+/* ---------------------------------------------------------------- comm_diag */
+
+static void test_diag(void)
+{
+    /* 初期化の成否 */
+    g_fail_init = 1;
+    comm_init(0);
+    CHECK(comm_diag.init_stage == COMM_INIT_FAIL_CAN_INIT);
+    g_fail_init = 0;
+    g_fail_filter = 1;
+    comm_init(0);
+    CHECK(comm_diag.init_stage == COMM_INIT_FAIL_FILTER);
+    g_fail_filter = 0;
+    g_fail_start = 1;
+    comm_init(0);
+    CHECK(comm_diag.init_stage == COMM_INIT_FAIL_START);
+    g_fail_start = 0;
+
+    setup(0);
+    CHECK(comm_diag.init_stage == COMM_INIT_RUNNING);
+    memset((void *)&comm_diag, 0, sizeof comm_diag);
+    comm_diag.init_stage = COMM_INIT_RUNNING;
+    g_can1.ESR = 0;
+    comm_poll();   /* EWGF の前回値を 0 に揃える */
+
+    /* TEC / REC / LEC。LEC=3（ACK）を検出したら ESR の LEC を 7 にする */
+    g_can1.ESR = (5u << CAN_ESR_REC_Pos) | (9u << CAN_ESR_TEC_Pos) | (3u << CAN_ESR_LEC_Pos);
+    comm_poll();
+    CHECK(comm_diag.tec == 9u && comm_diag.rec == 5u);
+    CHECK(comm_diag.tec_max == 9u && comm_diag.rec_max == 5u);
+    CHECK(comm_diag.esr == ((5u << CAN_ESR_REC_Pos) | (9u << CAN_ESR_TEC_Pos) | (3u << CAN_ESR_LEC_Pos)));
+    CHECK(comm_diag.lec_count[2] == 1u);
+    CHECK((g_can1.ESR & CAN_ESR_LEC) == CAN_ESR_LEC);
+    comm_poll();   /* LEC=7 のままなら数え直さない */
+    CHECK(comm_diag.lec_count[2] == 1u);
+
+    /* max は下がらない。LEC 0 は数えない。他の LEC も数える */
+    g_can1.ESR = (2u << CAN_ESR_REC_Pos) | (1u << CAN_ESR_TEC_Pos);
+    comm_poll();
+    CHECK(comm_diag.tec == 1u && comm_diag.rec == 2u);
+    CHECK(comm_diag.tec_max == 9u && comm_diag.rec_max == 5u);
+    for (uint32_t lec = 1; lec <= 6u; lec++) {
+        g_can1.ESR = lec << CAN_ESR_LEC_Pos;
+        comm_poll();
+    }
+    CHECK(comm_diag.lec_count[0] == 1u && comm_diag.lec_count[1] == 1u && comm_diag.lec_count[2] == 2u);
+    CHECK(comm_diag.lec_count[3] == 1u && comm_diag.lec_count[4] == 1u && comm_diag.lec_count[5] == 1u);
+
+    /* EWGF の立ち上がり（0→1→1 で 1 回） */
+    g_can1.ESR = 0;
+    comm_poll();
+    uint32_t ewg0 = comm_diag.ewg_count;
+    g_can1.ESR = CAN_ESR_EWGF;
+    comm_poll();
+    CHECK(comm_diag.ewg_count == ewg0 + 1u);
+    comm_poll();
+    CHECK(comm_diag.ewg_count == ewg0 + 1u);
+    g_can1.ESR = 0;
+    comm_poll();
+    g_can1.ESR = CAN_ESR_EWGF;
+    comm_poll();
+    CHECK(comm_diag.ewg_count == ewg0 + 2u);
+    g_can1.ESR = 0;
+
+    /* 直近の受信フレーム */
+    const uint8_t d[3] = {COMM_OP_READ, 0x20, 1};
+    rx(0x100, 3, d);
+    CHECK(comm_diag.last_rx_id == 0x100u && comm_diag.last_rx_dlc == 3u);
+    CHECK(comm_diag.last_rx_data[0] == COMM_OP_READ && comm_diag.last_rx_data[1] == 0x20u &&
+          comm_diag.last_rx_data[2] == 1u);
+}
+
 /* ---------------------------------------------------------------- 実行 */
 
 int main(void)
@@ -983,6 +1056,7 @@ int main(void)
     RUN(test_rx_ring_16);
     RUN(test_rx_ring_overflow);
     RUN(test_stats);
+    RUN(test_diag);
 
     printf("%d checks, %d failed\n", g_checks, g_fail);
     return g_fail ? 1 : 0;

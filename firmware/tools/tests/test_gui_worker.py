@@ -64,7 +64,7 @@ class ConnectTest(WorkerCase):
         c = self.wait_type(wk.Connected)
         self.assertEqual(c.info.device_id, 0xA3)
         self.assertEqual(c.info.board_id, 3)
-        self.assertEqual(len(c.symtab), 104)
+        self.assertEqual(len(c.symtab), 116)
         self.assertEqual(len(c.build_id), 20)
         keys = {i.key for i in c.items}
         self.assertIn("sym.cfg", keys)

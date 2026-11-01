@@ -132,7 +132,7 @@ class ProtocolTest(SimCase):
         self.device_error(lambda: self.link.request(p.CMD_SHORT_UP, struct.pack("<BI", 0, 0x20000000)), 0x32)
         self.device_error(lambda: self.link.request(p.CMD_SHORT_UP, struct.pack("<BI", 241, 0x20000000)), 0x32)
         self.device_error(lambda: self.link.short_up(0x00000000, 4), 0x33)
-        self.device_error(lambda: self.link.sym_info(104), 0x32)
+        self.device_error(lambda: self.link.sym_info(116), 0x32)
         self.device_error(lambda: self.link.request(p.CMD_SYM_FIND, b"\x00"), 0x32)
         self.device_error(lambda: self.link.sym_find("no_such_symbol"), 0x36)
 
@@ -829,12 +829,12 @@ class SymbolTest(SimCase):
             self.assertEqual(s[name].type, typ, f"{name} の TYPE")
             if typ != simmod.T_BYTES:
                 self.assertEqual(s[name].num, int(num), f"{name} の NUM")
-        self.assertEqual(len(c), 104)
+        self.assertEqual(len(c), 116)
 
     def test_symbols_over_usb(self) -> None:
         self.link.connect()
-        self.assertEqual(self.link.sym_count(), 104)
-        for i in (0, 20, 103):
+        self.assertEqual(self.link.sym_count(), 116)
+        for i in (0, 20, 115):
             info = self.link.sym_info(i)
             e = simmod.SYMBOLS[i]
             self.assertEqual((info.name, info.addr, info.type, info.num), (e.name, e.addr, e.type, e.num))
@@ -1088,7 +1088,7 @@ class CliSimTest(unittest.TestCase):
     def test_syms_and_can_req_enable(self) -> None:
         code, out, err = self.run_cli("--sim", "syms")
         self.assertEqual(code, 0, err)
-        self.assertIn("104 件", out)
+        self.assertIn("116 件", out)
         code, out, err = self.run_cli("--sim", "can-req", "0x103", "015001")
         self.assertEqual(code, 0, err)
         self.assertIn("data=81 50 00", out)

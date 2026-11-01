@@ -232,6 +232,12 @@ _GROUPS: List[Tuple[str, bool, Optional[str], List[Tuple[str, int]]]] = [
         ("comm_stats.rx_frames", T_U32), ("comm_stats.rx_dropped", T_U32), ("comm_stats.tx_frames", T_U32),
         ("comm_stats.tx_dropped", T_U32), ("comm_stats.err_events", T_U32), ("comm_stats.err_passive", T_U32),
         ("comm_stats.err_busoff", T_U32), ("comm_stats.err_rx_overrun", T_U32), ("comm_stats.err_last_code", T_U32)]),
+    # 配列は (名前, TYPE, 要素数)。CAN を持たないので init_stage 以外は常に 0
+    ("comm_diag", False, "comm_diag", [
+        ("comm_diag.init_stage", T_U32), ("comm_diag.esr", T_U32), ("comm_diag.tec", T_U32),
+        ("comm_diag.rec", T_U32), ("comm_diag.tec_max", T_U32), ("comm_diag.rec_max", T_U32),
+        ("comm_diag.ewg_count", T_U32), ("comm_diag.lec_count", T_U32, 6), ("comm_diag.last_rx_id", T_U32),
+        ("comm_diag.last_rx_dlc", T_U32), ("comm_diag.last_rx_data", T_U8, 8)]),
     ("usb_stats", False, "usb_stats", [
         ("usb_stats.rx_frames", T_U32), ("usb_stats.crc_errors", T_U32), ("usb_stats.dropped", T_U32),
         ("usb_stats.rx_overflow", T_U32), ("usb_stats.rx_timeouts", T_U32), ("usb_stats.bad_len", T_U32),
@@ -263,14 +269,16 @@ def _build_symbols() -> Tuple[List[SymEntry], List[Tuple[str, str, int]]]:
         cursor = (cursor + 3) & ~3
         base = cursor
         first = len(entries)
-        for name, typ in members:
+        for member in members:
+            name, typ = member[0], member[1]
+            num = member[2] if len(member) > 2 else 1
             fmt, size = _ELEM[typ]
             if not packed:
                 cursor = (cursor + size - 1) & ~(size - 1)
-            fields.append((name, fmt, cursor))
+            fields.append((name, fmt if num == 1 else str(num) + fmt, cursor))
             if not name.startswith("_"):
-                entries.append(SymEntry(name, cursor, typ, 1))
-            cursor += size
+                entries.append(SymEntry(name, cursor, typ, num))
+            cursor += size * num
         if whole is not None:
             entries.insert(first, SymEntry(whole, base, T_BYTES, cursor - base))
     return entries, fields
@@ -279,8 +287,9 @@ def _build_symbols() -> Tuple[List[SymEntry], List[Tuple[str, str, int]]]:
 SYMBOLS, _RAM_FIELDS = _build_symbols()
 SYM_INDEX: Dict[str, int] = {e.name: i for i, e in enumerate(SYMBOLS)}
 # 構造体全体の登録の大きさ（ファームの sizeof）
-assert len(SYMBOLS) == 104
-assert {e.name: e.num for e in SYMBOLS if e.type == T_BYTES} == {"cfg": 40, "comm_stats": 36, "usb_stats": 32}
+assert len(SYMBOLS) == 116
+assert {e.name: e.num for e in SYMBOLS if e.type == T_BYTES} == {
+    "cfg": 40, "comm_stats": 36, "comm_diag": 68, "usb_stats": 32}
 
 
 # ---------------------------------------------------------------- 原点復帰（home.c の移植）
@@ -1242,6 +1251,10 @@ class _Board:
                   "comm_stats.err_events", "comm_stats.err_passive", "comm_stats.err_busoff",
                   "comm_stats.err_rx_overrun", "comm_stats.err_last_code"):
             v[k] = 0
+        for k in ("esr", "tec", "rec", "tec_max", "rec_max", "ewg_count", "lec_count", "last_rx_id", "last_rx_dlc",
+                  "last_rx_data"):
+            v["comm_diag." + k] = 0
+        v["comm_diag.init_stage"] = 4      # 稼働中（実機の comm_init 成功時に近い値）
         for k, val in usb_stats.items():
             v["usb_stats." + k] = val
         return v
@@ -1556,6 +1569,8 @@ class SimSerial:
             val = values[name]
             if fmt == "f":
                 struct.pack_into("<f", ram, addr - RAM_BASE, float(val))
+            elif len(fmt) > 1:     # 配列（"6I" など）。値 0 を全要素に入れる
+                struct.pack_into("<" + fmt, ram, addr - RAM_BASE, *([val] * int(fmt[:-1])))
             else:
                 struct.pack_into("<" + fmt, ram, addr - RAM_BASE, val)
 

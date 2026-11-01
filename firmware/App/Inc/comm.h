@@ -51,6 +51,31 @@ typedef struct {
 
 extern volatile comm_stats_t comm_stats;
 
+/* comm_diag.init_stage の値（comm_init の進行。失敗した段階を示す） */
+#define COMM_INIT_NOT_RUN       0u   /* comm_init 未実行 */
+#define COMM_INIT_FAIL_CAN_INIT 1u   /* HAL_CAN_Init 失敗 */
+#define COMM_INIT_FAIL_FILTER   2u   /* HAL_CAN_ConfigFilter 失敗 */
+#define COMM_INIT_FAIL_START    3u   /* HAL_CAN_Start 失敗 */
+#define COMM_INIT_RUNNING       4u   /* 稼働中（can_ready = true） */
+
+/* CAN 診断情報（USB の名前表で公開する。周辺レジスタは USB から読めないため RAM にコピーする）。
+ * ESR 系は comm_poll（1 ms ごと）のサンプリング値なので、lec_count / ewg_count は下限値 */
+typedef struct {
+    uint32_t init_stage;       /* COMM_INIT_* */
+    uint32_t esr;             /* 直近に読んだ CAN1->ESR の生値 */
+    uint32_t tec;             /* ESR[23:16] 送信エラーカウンタ */
+    uint32_t rec;             /* ESR[31:24] 受信エラーカウンタ */
+    uint32_t tec_max;         /* tec の起動後最大値 */
+    uint32_t rec_max;         /* rec の起動後最大値 */
+    uint32_t ewg_count;       /* EWGF（エラー警告）が 0→1 に遷移した回数 */
+    uint32_t lec_count[6];    /* LEC 別の検出回数: [0]=Stuff [1]=Form [2]=ACK [3]=Bit recessive [4]=Bit dominant [5]=CRC */
+    uint32_t last_rx_id;      /* 直近の受信フレーム（フィルタ通過後） */
+    uint32_t last_rx_dlc;
+    uint8_t  last_rx_data[8];
+} comm_diag_t;
+
+extern volatile comm_diag_t comm_diag;
+
 /* ---- トランスポート非依存の要求処理 ---- */
 
 /*

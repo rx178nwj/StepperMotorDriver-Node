@@ -166,8 +166,15 @@ typedef struct {
 
 extern CAN_TypeDef g_can1;
 #define CAN1 (&g_can1)
+#define CAN_ESR_EWGF  (1u << 0)
 #define CAN_ESR_EPVF  (1u << 1)
 #define CAN_ESR_BOFF  (1u << 2)
+#define CAN_ESR_LEC_Pos  4u
+#define CAN_ESR_LEC      (7u << CAN_ESR_LEC_Pos)
+#define CAN_ESR_TEC_Pos  16u
+#define CAN_ESR_TEC      (0xFFu << CAN_ESR_TEC_Pos)
+#define CAN_ESR_REC_Pos  24u
+#define CAN_ESR_REC      (0xFFu << CAN_ESR_REC_Pos)
 #define __HAL_RCC_CAN1_CLK_ENABLE()  ((void)0)
 #define CAN1_RX0_IRQn  20
 #define CAN1_SCE_IRQn  22

@@ -31,6 +31,7 @@ GROUP_LABELS: Dict[str, str] = {
 
 MODE_NAMES = {0: "IDLE", 1: "POS", 2: "VEL"}
 HOME_STATE_NAMES = {0: "IDLE", 1: "SEEK", 2: "SEEK_STOP", 3: "BACK", 4: "BACK_STOP", 5: "DONE", 6: "FAILED"}
+COMM_INIT_STAGE_NAMES = {0: "未実行", 1: "CAN_Init失敗", 2: "Filter失敗", 3: "Start失敗", 4: "稼働中"}
 RESET_CSR_BITS = ((24, "FWRSTF"), (25, "OBLRSTF"), (26, "PINRSTF"), (27, "BORRSTF"),
                   (28, "SFTRSTF"), (29, "IWDGRSTF"), (30, "WWDGRSTF"), (31, "LPWRRSTF"))
 
@@ -217,6 +218,17 @@ _SYM_DEFS: List[_T] = [
     ("comm", "comm_stats.err_busoff", "u32", "CAN バスオフ", "", {"counter": True}),
     ("comm", "comm_stats.err_rx_overrun", "u32", "CAN 受信オーバーラン", "", {"counter": True}),
     ("comm", "comm_stats.err_last_code", "u32", "CAN 直近エラーコード", "", {}),
+    # CAN 診断（comm_diag。TEC/REC/LEC は 1 ms サンプリングの値）
+    ("comm", "comm_diag.init_stage", "u32", "CAN 初期化段階", "", {"enum": COMM_INIT_STAGE_NAMES}),
+    ("comm", "comm_diag.tec", "u32", "CAN TEC", "", {}),
+    ("comm", "comm_diag.rec", "u32", "CAN REC", "", {}),
+    ("comm", "comm_diag.tec_max", "u32", "CAN TEC 最大", "", {}),
+    ("comm", "comm_diag.rec_max", "u32", "CAN REC 最大", "", {}),
+    ("comm", "comm_diag.ewg_count", "u32", "CAN エラー警告回数", "", {"counter": True}),
+    # 配列は要素単位の名前が名前表に無いため、24 バイト（u32 × 6）の生バイト列で表示する
+    # 並びは Stuff, Form, ACK, Bit recessive, Bit dominant, CRC
+    ("comm", "comm_diag.lec_count", "bytes", "CAN LEC 回数(Stuff,Form,ACK,BitR,BitD,CRC)", "", {"size": 24}),
+    ("comm", "comm_diag.last_rx_id", "u32", "CAN 直近受信 ID", "", {}),
     ("comm", "usb_stats.rx_frames", "u32", "USB 受信フレーム", "", {"counter": True}),
     ("comm", "usb_stats.crc_errors", "u32", "USB CRC エラー", "", {"counter": True}),
     ("comm", "usb_stats.dropped", "u32", "USB 破棄", "", {"counter": True}),

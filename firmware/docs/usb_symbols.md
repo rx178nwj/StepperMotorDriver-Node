@@ -138,6 +138,25 @@ USB のメモリ読み出しはペリフェラル領域（TIM2・GPIO）を読�
 | `comm_stats.err_rx_overrun` | u32 | 受信 FIFO オーバーラン回数 |
 | `comm_stats.err_last_code` | u32 | 直近の HAL_CAN_GetError() 値 |
 
+## CAN 診断（`App/Src/comm.c`）
+
+`comm_diag` は構造体全体（68 バイト、TYPE 0x10）。周辺レジスタは USB から読めないため、`comm_poll`（1 ms ごと）が CAN1->ESR を RAM にコピーしたもの。サンプリング周期より短い事象は取りこぼすので、`ewg_count` と `lec_count` は下限値。
+
+| 名前 | TYPE | 内容 |
+|------|------|------|
+| `comm_diag` | 0x10 ×68 | CAN 診断全体 |
+| `comm_diag.init_stage` | u32 | comm_init の進行。0=未実行、1=HAL_CAN_Init 失敗、2=HAL_CAN_ConfigFilter 失敗、3=HAL_CAN_Start 失敗、4=稼働中 |
+| `comm_diag.esr` | u32 | 直近に読んだ CAN1->ESR の生値 |
+| `comm_diag.tec` | u32 | 送信エラーカウンタ（ESR[23:16]） |
+| `comm_diag.rec` | u32 | 受信エラーカウンタ（ESR[31:24]） |
+| `comm_diag.tec_max` | u32 | tec の起動後最大値 |
+| `comm_diag.rec_max` | u32 | rec の起動後最大値 |
+| `comm_diag.ewg_count` | u32 | EWGF（エラー警告）が 0→1 に遷移した回数 |
+| `comm_diag.lec_count` | u32 ×6 | LEC 別の検出回数。順に Stuff、Form、ACK、Bit recessive、Bit dominant、CRC |
+| `comm_diag.last_rx_id` | u32 | 直近に受信したフレームの ID（フィルタ通過後） |
+| `comm_diag.last_rx_dlc` | u32 | 同 DLC |
+| `comm_diag.last_rx_data` | u8 ×8 | 同データ（DLC を超えるバイトは不定） |
+
 ## USB 統計（`App/Src/usb_proto.c`）
 
 `usb_stats` は構造体全体（32 バイト、TYPE 0x10）。
