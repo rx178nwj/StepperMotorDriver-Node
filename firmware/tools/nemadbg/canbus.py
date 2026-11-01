@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Optional
 
@@ -52,6 +53,23 @@ class CanBus:
             pass
 
 
+def _add_libusb_to_path() -> None:
+    """Windows の gs_usb 用。python-can(gs-usb) は libusb-1.0.dll のパスを渡さないため、
+    libusb-package 同梱の DLL のあるフォルダを PATH の先頭へ足す。無ければ何もしない（Linux はシステムの libusb）。"""
+    try:
+        import libusb_package   # 遅延 import
+        lib = libusb_package.get_library_path()
+    except Exception:
+        return
+    if not lib:
+        return
+    d = os.path.dirname(str(lib))
+    parts = os.environ.get("PATH", "").split(os.pathsep)
+    if d in parts:
+        return
+    os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+
+
 def open_bus(interface: str = DEFAULT_INTERFACE, channel: Optional[str] = None,
              bitrate: int = DEFAULT_BITRATE) -> CanBus:
     """アダプタを開く。python-can が無い・開けないときは CanUnavailable。
@@ -70,6 +88,8 @@ def open_bus(interface: str = DEFAULT_INTERFACE, channel: Optional[str] = None,
         raise CanUnavailable(f"{interface} には --can-channel（例: COM5）が必要です")
     else:
         kwargs["channel"] = channel
+    if interface == "gs_usb":
+        _add_libusb_to_path()
     try:
         bus = can.Bus(**kwargs)
     except Exception as e:

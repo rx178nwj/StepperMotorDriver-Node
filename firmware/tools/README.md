@@ -133,6 +133,7 @@ A〜C だけなら追加は不要（`requirements.txt`）。D（オシロ）と 
 
 - pyvisa / python-can は該当グループの実行時だけ import する。未インストール・機器が見つからない場合は、そのグループを `SKIP`（理由つき）にして続ける。
 - オシロは NI-VISA が必要（`docs/oscilloscope_ds1054z.md`）。CAN アダプタ DSD TECH SH-C30L は、candleLight ファームなら `gs_usb`（既定）、slcan ファームなら `--can-interface slcan --can-channel COM5`。どちらも python-can 経由。
+- Windows の `gs_usb` は libusb-1.0.dll が必要。`libusb-package`（requirements-selftest.txt に含む）の DLL を `open_bus()` が PATH へ自動で足す。
 
 ### 配線
 
